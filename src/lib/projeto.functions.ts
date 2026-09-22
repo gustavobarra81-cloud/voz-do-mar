@@ -124,12 +124,12 @@ export const lerEdital = createServerFn({ method: "POST" })
     try {
       const bruto = JSON.parse(limpo.slice(inicio, fim + 1)) as Record<string, string>;
       return {
-        titulo: bruto.titulo || data.nomeArquivo.replace(/\.pdf$/i, ""),
-        orgao: bruto.orgao || "",
-        resumo: bruto.resumo || "",
-        prazo: /^\d{4}-\d{2}-\d{2}$/.test(bruto.prazo ?? "") ? bruto.prazo : null,
-        valor_maximo: bruto.valor_maximo || "",
-        exigencias: bruto.exigencias || "",
+        titulo: bruto["titulo"] || data.nomeArquivo.replace(/\.pdf$/i, ""),
+        orgao: bruto["orgao"] || "",
+        resumo: bruto["resumo"] || "",
+        prazo: /^\d{4}-\d{2}-\d{2}$/.test(bruto["prazo"] ?? "") ? bruto["prazo"]! : null,
+        valor_maximo: bruto["valor_maximo"] || "",
+        exigencias: bruto["exigencias"] || "",
       };
     } catch {
       throw new Error("Não conseguimos ler esse arquivo. Tente enviar outro PDF do edital.");
