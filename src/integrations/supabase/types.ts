@@ -14,7 +14,116 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      editais: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          exigencias: string | null
+          id: string
+          orgao: string | null
+          prazo: string | null
+          publico: boolean
+          resumo: string | null
+          texto_completo: string | null
+          titulo: string
+          valor_maximo: string | null
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          exigencias?: string | null
+          id?: string
+          orgao?: string | null
+          prazo?: string | null
+          publico?: boolean
+          resumo?: string | null
+          texto_completo?: string | null
+          titulo: string
+          valor_maximo?: string | null
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          exigencias?: string | null
+          id?: string
+          orgao?: string | null
+          prazo?: string | null
+          publico?: boolean
+          resumo?: string | null
+          texto_completo?: string | null
+          titulo?: string
+          valor_maximo?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          comunidade: string | null
+          created_at: string
+          id: string
+          nome: string | null
+        }
+        Insert: {
+          comunidade?: string | null
+          created_at?: string
+          id: string
+          nome?: string | null
+        }
+        Update: {
+          comunidade?: string | null
+          created_at?: string
+          id?: string
+          nome?: string | null
+        }
+        Relationships: []
+      }
+      projetos: {
+        Row: {
+          conteudo: string | null
+          created_at: string
+          edital_id: string | null
+          id: string
+          respostas: Json
+          status: string
+          titulo: string
+          transcricao: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          conteudo?: string | null
+          created_at?: string
+          edital_id?: string | null
+          id?: string
+          respostas?: Json
+          status?: string
+          titulo?: string
+          transcricao?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          conteudo?: string | null
+          created_at?: string
+          edital_id?: string | null
+          id?: string
+          respostas?: Json
+          status?: string
+          titulo?: string
+          transcricao?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projetos_edital_id_fkey"
+            columns: ["edital_id"]
+            isOneToOne: false
+            referencedRelation: "editais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
