@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Check, FileUp, Loader2, Pencil } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, FileUp, HelpCircle, Loader2, Pencil } from "lucide-react";
 import { Cabecalho } from "@/components/Cabecalho";
 import { BotaoGravar } from "@/components/BotaoGravar";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/useAuth";
-import { escreverProjeto, lerEdital, transcreverAudio } from "@/lib/projeto.functions";
+import { analisarEdital, escreverProjeto, lerEdital, transcreverAudio } from "@/lib/projeto.functions";
 
 export const Route = createFileRoute("/novo")({
   head: () => ({
@@ -51,7 +51,10 @@ type Edital = {
   exigencias: string | null;
   valor_maximo: string | null;
   prazo: string | null;
+  arquivo_path?: string | null;
 };
+
+type ItemAnalise = { requisito: string; situacao: "atendido" | "pendente" | "nao_localizado"; evidencia: string; orientacao: string };
 
 function NovoProjeto() {
   const navigate = useNavigate();
@@ -63,10 +66,15 @@ function NovoProjeto() {
   const [transcrevendo, setTranscrevendo] = useState(false);
   const [enviandoPdf, setEnviandoPdf] = useState(false);
   const [gerando, setGerando] = useState(false);
+  const [analisando, setAnalisando] = useState(false);
+  const [analiseId, setAnaliseId] = useState<string | null>(null);
+  const [resumoAnalise, setResumoAnalise] = useState("");
+  const [checklist, setChecklist] = useState<ItemAnalise[]>([]);
 
   const transcrever = useServerFn(transcreverAudio);
   const importarEdital = useServerFn(lerEdital);
   const gerar = useServerFn(escreverProjeto);
+  const analisar = useServerFn(analisarEdital);
 
   useEffect(() => {
     if (!carregando && !user) void navigate({ to: "/entrar" });
@@ -77,11 +85,21 @@ function NovoProjeto() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("editais")
-        .select("id, titulo, orgao, resumo, exigencias, valor_maximo, prazo")
+        .select("id, titulo, orgao, resumo, exigencias, valor_maximo, prazo, arquivo_path")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Edital[];
     },
+  });
+
+  const { data: organizacao } = useQuery({
+    enabled: Boolean(user), queryKey: ["organizacao", user?.id],
+    queryFn: async () => { const { data, error } = await supabase.from("organizacoes").select("*").maybeSingle(); if (error) throw error; return data; },
+  });
+
+  const { data: documentos } = useQuery({
+    enabled: Boolean(organizacao), queryKey: ["documentos", organizacao?.id],
+    queryFn: async () => { const { data, error } = await supabase.from("documentos_organizacao").select("categoria, nome, data_validade"); if (error) throw error; return data; },
   });
 
   const editalEscolhido = useMemo(
@@ -110,9 +128,14 @@ function NovoProjeto() {
         data: { nomeArquivo: arquivo.name, pdfBase64: base64 },
       });
 
+      if (!user || !organizacao) throw new Error("Cadastre sua organização antes de enviar um edital.");
+      const nomeSeguro = arquivo.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+      const arquivoPath = `${user.id}/editais/${crypto.randomUUID()}-${nomeSeguro}`;
+      const upload = await supabase.storage.from("documentos-organizacoes").upload(arquivoPath, arquivo, { contentType: "application/pdf" });
+      if (upload.error) throw new Error("Não conseguimos guardar o PDF do edital.");
       const { data, error } = await supabase
         .from("editais")
-        .insert({ ...lido, criado_por: user!.id, publico: false })
+        .insert({ ...lido, criado_por: user.id, organizacao_id: organizacao.id, arquivo_path: arquivoPath, publico: false })
         .select("id")
         .single();
       if (error) throw error;
@@ -125,6 +148,25 @@ function NovoProjeto() {
     } finally {
       setEnviandoPdf(false);
     }
+  }
+
+  async function analisarCompatibilidade() {
+    if (!editalEscolhido || !organizacao) return;
+    setAnalisando(true);
+    try {
+      const resultado = await analisar({ data: {
+        edital: { ...editalEscolhido, prazo: editalEscolhido.prazo },
+        organizacao,
+        documentos: documentos ?? [],
+      } });
+      const { data, error } = await supabase.from("analises_editais").upsert({
+        organizacao_id: organizacao.id, edital_id: editalEscolhido.id,
+        checklist: resultado.itens, resumo: resultado.resumo, updated_at: new Date().toISOString(),
+      }, { onConflict: "organizacao_id,edital_id" }).select("id").single();
+      if (error) throw error;
+      setAnaliseId(data.id); setChecklist(resultado.itens); setResumoAnalise(resultado.resumo); setEtapa(1);
+    } catch (erro) { toast.error(erro instanceof Error ? erro.message : "Não conseguimos analisar o edital."); }
+    finally { setAnalisando(false); }
   }
 
   async function aoTranscrever(base64: string) {
@@ -158,6 +200,8 @@ function NovoProjeto() {
           editalResumo: editalEscolhido.resumo,
           editalExigencias: editalEscolhido.exigencias,
           editalValor: editalEscolhido.valor_maximo,
+          organizacao,
+          checklist,
           respostas: PERGUNTAS.map((pergunta, i) => ({
             pergunta,
             resposta: respostas[i] ?? "",
@@ -168,8 +212,10 @@ function NovoProjeto() {
       const { data, error } = await supabase
         .from("projetos")
         .insert({
-          user_id: user!.id,
+          user_id: user?.id ?? "",
           edital_id: editalEscolhido.id,
+          organizacao_id: organizacao?.id ?? null,
+          analise_id: analiseId,
           titulo,
           conteudo: html,
           transcricao: respostas.join("\n\n"),
@@ -196,10 +242,13 @@ function NovoProjeto() {
       <main className="mx-auto max-w-2xl px-4 py-8">
         {etapa === 0 && (
           <section className="space-y-5">
-            <h1 className="text-3xl font-bold">Para qual edital é o projeto?</h1>
+            <p className="font-bold text-primary">Passo 3 de 4</p>
+            <h1 className="text-3xl font-bold">Qual edital você quer analisar?</h1>
             <p className="text-lg text-muted-foreground">
-              Escolha um da lista ou envie o arquivo PDF do edital que você recebeu.
+              Vamos comparar o edital com o cadastro e os documentos da sua organização.
             </p>
+
+            {!organizacao && <Card className="border-2 border-destructive/40"><CardContent className="space-y-3 py-6"><p className="font-bold">Cadastre sua organização antes de continuar.</p><Button asChild><a href="/organizacao">Fazer cadastro</a></Button></CardContent></Card>}
 
             <div className="space-y-3">
               {editais?.map((edital) => (
@@ -258,15 +307,27 @@ function NovoProjeto() {
             <Button
               size="lg"
               className="h-16 w-full text-lg font-bold"
-              disabled={!editalId}
-              onClick={() => setEtapa(1)}
+              disabled={!editalId || !organizacao || analisando}
+              onClick={() => void analisarCompatibilidade()}
             >
-              Continuar <ArrowRight className="ml-2 size-5" />
+              {analisando ? <><Loader2 className="mr-2 size-5 animate-spin" />Comparando requisitos...</> : <>Ver checklist <ArrowRight className="ml-2 size-5" /></>}
             </Button>
           </section>
         )}
 
         {etapa === 1 && (
+          <section className="space-y-6">
+            <div><p className="font-bold text-primary">Resultado da conferência</p><h1 className="mt-1 text-3xl font-bold">Checklist do edital</h1><p className="mt-2 text-muted-foreground">{resumoAnalise}</p></div>
+            <div className="space-y-3">{checklist.map((item, i) => {
+              const visual = item.situacao === "atendido" ? { Icone: CheckCircle2, texto: "Atendido", classe: "text-primary" } : item.situacao === "pendente" ? { Icone: AlertTriangle, texto: "Pendente", classe: "text-destructive" } : { Icone: HelpCircle, texto: "Não localizado", classe: "text-muted-foreground" };
+              return <Card key={`${item.requisito}-${i}`}><CardContent className="py-5"><div className="flex items-start gap-3"><visual.Icone className={`mt-1 size-5 shrink-0 ${visual.classe}`} /><div><p className="font-bold">{item.requisito}</p><p className={`text-sm font-bold ${visual.classe}`}>{visual.texto}</p>{item.evidencia && <p className="mt-2 text-sm">{item.evidencia}</p>}{item.orientacao && <p className="mt-1 text-sm text-muted-foreground">{item.orientacao}</p>}</div></div></CardContent></Card>;
+            })}</div>
+            <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">Este checklist ajuda na conferência, mas não substitui a validação do órgão responsável ou uma orientação jurídica.</p>
+            <div className="flex gap-3"><Button variant="outline" className="h-14 flex-1" onClick={() => setEtapa(0)}><ArrowLeft className="mr-2 size-5" />Trocar edital</Button><Button className="h-14 flex-1" onClick={() => setEtapa(2)}>Contar minha ideia<ArrowRight className="ml-2 size-5" /></Button></div>
+          </section>
+        )}
+
+        {etapa === 2 && (
           <section className="space-y-6">
             <div>
               <p className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
@@ -300,7 +361,7 @@ function NovoProjeto() {
               <Button
                 variant="outline"
                 className="h-14 flex-1 text-base"
-                onClick={() => (indice === 0 ? setEtapa(0) : setIndice(indice - 1))}
+                onClick={() => (indice === 0 ? setEtapa(1) : setIndice(indice - 1))}
               >
                 <ArrowLeft className="mr-2 size-5" /> Voltar
               </Button>
@@ -309,7 +370,7 @@ function NovoProjeto() {
                   Próxima <ArrowRight className="ml-2 size-5" />
                 </Button>
               ) : (
-                <Button className="h-14 flex-1 text-base" onClick={() => setEtapa(2)}>
+                <Button className="h-14 flex-1 text-base" onClick={() => setEtapa(3)}>
                   Terminei <Check className="ml-2 size-5" />
                 </Button>
               )}
@@ -317,8 +378,9 @@ function NovoProjeto() {
           </section>
         )}
 
-        {etapa === 2 && (
+        {etapa === 3 && (
           <section className="space-y-6">
+            <p className="font-bold text-primary">Passo 4 de 4</p>
             <h1 className="text-3xl font-bold">Pronto para escrever o projeto</h1>
             <p className="text-lg text-muted-foreground">
               Edital: <strong>{editalEscolhido?.titulo}</strong>. Você respondeu {respondidas} de{" "}
@@ -342,7 +404,7 @@ function NovoProjeto() {
               <Button
                 variant="outline"
                 className="h-16 text-base sm:flex-1"
-                onClick={() => setEtapa(1)}
+                onClick={() => setEtapa(2)}
               >
                 <ArrowLeft className="mr-2 size-5" /> Corrigir respostas
               </Button>
