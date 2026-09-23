@@ -10,14 +10,27 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DocumentosRouteImport } from './routes/documentos'
+import { Route as EditaisRouteImport } from './routes/editais'
 import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as NovoRouteImport } from './routes/novo'
+import { Route as OrganizacaoRouteImport } from './routes/organizacao'
 import { Route as ProjetosIndexRouteImport } from './routes/projetos.index'
 import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentosRoute = DocumentosRouteImport.update({
+  id: '/documentos',
+  path: '/documentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EditaisRoute = EditaisRouteImport.update({
+  id: '/editais',
+  path: '/editais',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EntrarRoute = EntrarRouteImport.update({
@@ -28,6 +41,11 @@ const EntrarRoute = EntrarRouteImport.update({
 const NovoRoute = NovoRouteImport.update({
   id: '/novo',
   path: '/novo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrganizacaoRoute = OrganizacaoRouteImport.update({
+  id: '/organizacao',
+  path: '/organizacao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjetosIndexRoute = ProjetosIndexRouteImport.update({
@@ -43,38 +61,75 @@ const ProjetosIdRoute = ProjetosIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/documentos': typeof DocumentosRoute
+  '/editais': typeof EditaisRoute
   '/entrar': typeof EntrarRoute
   '/novo': typeof NovoRoute
+  '/organizacao': typeof OrganizacaoRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/': typeof ProjetosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/documentos': typeof DocumentosRoute
+  '/editais': typeof EditaisRoute
   '/entrar': typeof EntrarRoute
   '/novo': typeof NovoRoute
+  '/organizacao': typeof OrganizacaoRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos': typeof ProjetosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/documentos': typeof DocumentosRoute
+  '/editais': typeof EditaisRoute
   '/entrar': typeof EntrarRoute
   '/novo': typeof NovoRoute
+  '/organizacao': typeof OrganizacaoRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/': typeof ProjetosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/entrar' | '/novo' | '/projetos/$id' | '/projetos/'
+  fullPaths:
+    | '/'
+    | '/documentos'
+    | '/editais'
+    | '/entrar'
+    | '/novo'
+    | '/organizacao'
+    | '/projetos/$id'
+    | '/projetos/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/entrar' | '/novo' | '/projetos/$id' | '/projetos'
-  id: '__root__' | '/' | '/entrar' | '/novo' | '/projetos/$id' | '/projetos/'
+  to:
+    | '/'
+    | '/documentos'
+    | '/editais'
+    | '/entrar'
+    | '/novo'
+    | '/organizacao'
+    | '/projetos/$id'
+    | '/projetos'
+  id:
+    | '__root__'
+    | '/'
+    | '/documentos'
+    | '/editais'
+    | '/entrar'
+    | '/novo'
+    | '/organizacao'
+    | '/projetos/$id'
+    | '/projetos/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DocumentosRoute: typeof DocumentosRoute
+  EditaisRoute: typeof EditaisRoute
   EntrarRoute: typeof EntrarRoute
   NovoRoute: typeof NovoRoute
+  OrganizacaoRoute: typeof OrganizacaoRoute
   ProjetosIdRoute: typeof ProjetosIdRoute
   ProjetosIndexRoute: typeof ProjetosIndexRoute
 }
@@ -86,6 +141,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documentos': {
+      id: '/documentos'
+      path: '/documentos'
+      fullPath: '/documentos'
+      preLoaderRoute: typeof DocumentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/editais': {
+      id: '/editais'
+      path: '/editais'
+      fullPath: '/editais'
+      preLoaderRoute: typeof EditaisRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/entrar': {
@@ -100,6 +169,13 @@ declare module '@tanstack/react-router' {
       path: '/novo'
       fullPath: '/novo'
       preLoaderRoute: typeof NovoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/organizacao': {
+      id: '/organizacao'
+      path: '/organizacao'
+      fullPath: '/organizacao'
+      preLoaderRoute: typeof OrganizacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projetos/': {
@@ -121,8 +197,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DocumentosRoute: DocumentosRoute,
+  EditaisRoute: EditaisRoute,
   EntrarRoute: EntrarRoute,
   NovoRoute: NovoRoute,
+  OrganizacaoRoute: OrganizacaoRoute,
   ProjetosIdRoute: ProjetosIdRoute,
   ProjetosIndexRoute: ProjetosIndexRoute,
 }

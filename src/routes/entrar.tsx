@@ -41,7 +41,7 @@ function Entrar() {
   const [ocupado, setOcupado] = useState(false);
 
   useEffect(() => {
-    if (user) void navigate({ to: "/projetos" });
+    if (user) void navigate({ to: "/organizacao" });
   }, [user, navigate]);
 
   async function enviar(evento: React.FormEvent) {
@@ -62,7 +62,7 @@ function Entrar() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
         if (error) throw error;
-        void navigate({ to: "/projetos" });
+        void navigate({ to: "/organizacao" });
       }
     } catch (erro) {
       toast.error(erro instanceof Error ? erro.message : "Não deu certo. Tente de novo.");
@@ -80,7 +80,7 @@ function Entrar() {
       return;
     }
     if (resultado.redirected) return;
-    void navigate({ to: "/projetos" });
+    void navigate({ to: "/organizacao" });
   }
 
   return (

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Anchor, LogOut } from "lucide-react";
+import { Anchor, Building2, FileCheck2, FileText, FolderOpen, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/useAuth";
@@ -18,11 +18,23 @@ export function Cabecalho() {
           Voz do Mar
         </Link>
 
-        <nav className="flex items-center gap-2">
+        <nav className="flex items-center gap-1">
           {user ? (
             <>
-              <Button asChild variant="ghost" className="text-base">
+              <Button asChild variant="ghost" className="hidden text-base md:inline-flex">
+                <Link to="/organizacao"><Building2 className="mr-2 size-4" /> Organização</Link>
+              </Button>
+              <Button asChild variant="ghost" className="hidden text-base md:inline-flex">
+                <Link to="/documentos"><FolderOpen className="mr-2 size-4" /> Documentos</Link>
+              </Button>
+              <Button asChild variant="ghost" className="hidden text-base lg:inline-flex">
+                <Link to="/editais"><FileText className="mr-2 size-4" /> Meus editais</Link>
+              </Button>
+              <Button asChild variant="ghost" className="hidden text-base sm:inline-flex">
                 <Link to="/projetos">Meus projetos</Link>
+              </Button>
+              <Button asChild variant="ghost" size="icon" className="md:hidden" aria-label="Minha organização">
+                <Link to="/organizacao"><FileCheck2 className="size-5" /></Link>
               </Button>
               <Button
                 variant="ghost"
