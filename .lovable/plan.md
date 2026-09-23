@@ -40,7 +40,7 @@ Gerar, revisar e baixar o projeto
 ## 2. Documentos comprobatórios
 
 - Criar uma área privada de documentos da organização.
-- Aceitar PDF, JPG e PNG, com categoria, nome, data de emissão e validade quando aplicável.
+- Aceitar PDF, JPG e PNG, com categoria, nome, data de emissão e campo de validade em todos os documentos.
 - Incluir categorias iniciais adaptáveis:
   - cartão do CNPJ;
   - estatuto ou contrato social;
@@ -51,7 +51,8 @@ Gerar, revisar e baixar o projeto
   - comprovante de endereço;
   - outros documentos.
 - Permitir anexar, substituir, visualizar e excluir arquivos.
-- Mostrar alertas de documento ausente ou vencido.
+- Mostrar avisos visuais por documento: válido, vence em breve (30 dias), vencido ou sem validade informada.
+- Destacar no início da área de documentos as certidões próximas do vencimento e as já vencidas.
 - Manter arquivos e dados pessoais privados, acessíveis somente pela conta proprietária.
 
 ## 3. Leitura e análise do edital
@@ -112,6 +113,7 @@ Gerar, revisar e baixar o projeto
 
 - Testar cadastro incompleto e retomada posterior.
 - Testar inclusão, substituição, visualização e remoção de cada tipo de documento.
+- Testar os avisos de validade, incluindo a mudança automática de “vence em breve” para “vencido”.
 - Testar edital compatível, edital com pendências e requisito que não possa ser confirmado.
 - Confirmar que uma conta nunca acessa dados ou arquivos de outra.
 - Testar no celular todo o caminho, do primeiro acesso ao projeto final.
