@@ -8,6 +8,8 @@ import { Cabecalho } from "@/components/Cabecalho";
 import { BotaoGravar } from "@/components/BotaoGravar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/useAuth";
@@ -70,6 +72,25 @@ function NovoProjeto() {
   const [analiseId, setAnaliseId] = useState<string | null>(null);
   const [resumoAnalise, setResumoAnalise] = useState("");
   const [checklist, setChecklist] = useState<ItemAnalise[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const salvo = window.localStorage.getItem(`voz-do-mar:novo:${user.id}`);
+    if (!salvo) return;
+    try {
+      const dados = JSON.parse(salvo) as { editalId?: string; respostas?: string[]; checklist?: ItemAnalise[]; resumoAnalise?: string; analiseId?: string };
+      if (dados.editalId) setEditalId(dados.editalId);
+      if (dados.respostas?.length === PERGUNTAS.length) setRespostas(dados.respostas);
+      if (dados.checklist) setChecklist(dados.checklist);
+      if (dados.resumoAnalise) setResumoAnalise(dados.resumoAnalise);
+      if (dados.analiseId) setAnaliseId(dados.analiseId);
+    } catch { window.localStorage.removeItem(`voz-do-mar:novo:${user.id}`); }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    window.localStorage.setItem(`voz-do-mar:novo:${user.id}`, JSON.stringify({ editalId, respostas, checklist, resumoAnalise, analiseId }));
+  }, [user, editalId, respostas, checklist, resumoAnalise, analiseId]);
 
   const transcrever = useServerFn(transcreverAudio);
   const importarEdital = useServerFn(lerEdital);
@@ -190,7 +211,7 @@ function NovoProjeto() {
   }
 
   async function finalizar() {
-    if (!editalEscolhido) return;
+    if (!editalEscolhido || !organizacao || !user) return;
     setGerando(true);
     try {
       const { html, titulo } = await gerar({
@@ -200,7 +221,7 @@ function NovoProjeto() {
           editalResumo: editalEscolhido.resumo,
           editalExigencias: editalEscolhido.exigencias,
           editalValor: editalEscolhido.valor_maximo,
-          organizacao,
+          organizacao: { ...organizacao },
           checklist,
           respostas: PERGUNTAS.map((pergunta, i) => ({
             pergunta,
@@ -212,7 +233,7 @@ function NovoProjeto() {
       const { data, error } = await supabase
         .from("projetos")
         .insert({
-          user_id: user?.id ?? "",
+          user_id: user.id,
           edital_id: editalEscolhido.id,
           organizacao_id: organizacao?.id ?? null,
           analise_id: analiseId,
@@ -226,6 +247,7 @@ function NovoProjeto() {
         .single();
       if (error) throw error;
 
+      window.localStorage.removeItem(`voz-do-mar:novo:${user.id}`);
       void navigate({ to: "/projetos/$id", params: { id: data.id } });
     } catch (erro) {
       toast.error(erro instanceof Error ? erro.message : "Não conseguimos escrever o projeto.");
@@ -318,6 +340,7 @@ function NovoProjeto() {
         {etapa === 1 && (
           <section className="space-y-6">
             <div><p className="font-bold text-primary">Resultado da conferência</p><h1 className="mt-1 text-3xl font-bold">Checklist do edital</h1><p className="mt-2 text-muted-foreground">{resumoAnalise}</p></div>
+            {editalEscolhido && <Card><CardContent className="space-y-4 py-5"><h2 className="text-lg font-bold">Informações lidas no edital</h2><div className="space-y-2"><Label>Título</Label><Input value={editalEscolhido.titulo} onChange={(e) => { const valor = e.target.value; void supabase.from("editais").update({ titulo: valor }).eq("id", editalEscolhido.id); void refetch(); }} /></div><div className="space-y-2"><Label>Exigências encontradas</Label><Textarea value={editalEscolhido.exigencias ?? ""} onChange={(e) => { const valor = e.target.value; void supabase.from("editais").update({ exigencias: valor }).eq("id", editalEscolhido.id); void refetch(); }} /></div><Button variant="outline" className="w-full" disabled={analisando} onClick={() => void analisarCompatibilidade()}>{analisando && <Loader2 className="mr-2 size-4 animate-spin" />}Salvar correções e analisar novamente</Button></CardContent></Card>}
             <div className="space-y-3">{checklist.map((item, i) => {
               const visual = item.situacao === "atendido" ? { Icone: CheckCircle2, texto: "Atendido", classe: "text-primary" } : item.situacao === "pendente" ? { Icone: AlertTriangle, texto: "Pendente", classe: "text-destructive" } : { Icone: HelpCircle, texto: "Não localizado", classe: "text-muted-foreground" };
               return <Card key={`${item.requisito}-${i}`}><CardContent className="py-5"><div className="flex items-start gap-3"><visual.Icone className={`mt-1 size-5 shrink-0 ${visual.classe}`} /><div><p className="font-bold">{item.requisito}</p><p className={`text-sm font-bold ${visual.classe}`}>{visual.texto}</p>{item.evidencia && <p className="mt-2 text-sm">{item.evidencia}</p>}{item.orientacao && <p className="mt-1 text-sm text-muted-foreground">{item.orientacao}</p>}</div></div></CardContent></Card>;

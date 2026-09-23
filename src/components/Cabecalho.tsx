@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Anchor, Building2, FileCheck2, FolderOpen, LogOut } from "lucide-react";
+import { Anchor, Building2, FileCheck2, FileText, FolderOpen, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/useAuth";
@@ -26,6 +26,9 @@ export function Cabecalho() {
               </Button>
               <Button asChild variant="ghost" className="hidden text-base md:inline-flex">
                 <Link to="/documentos"><FolderOpen className="mr-2 size-4" /> Documentos</Link>
+              </Button>
+              <Button asChild variant="ghost" className="hidden text-base lg:inline-flex">
+                <Link to="/editais"><FileText className="mr-2 size-4" /> Meus editais</Link>
               </Button>
               <Button asChild variant="ghost" className="hidden text-base sm:inline-flex">
                 <Link to="/projetos">Meus projetos</Link>

@@ -220,7 +220,7 @@ export const escreverProjeto = createServerFn({ method: "POST" })
       system: [
         "Você é um redator experiente de projetos sociais e socioambientais no Brasil, especialista em editais públicos e em pesca artesanal.",
         "Escreva projetos completos, formais e prontos para submissão, sempre em português do Brasil.",
-        "Use SOMENTE as informações que a comunidade contou. Onde faltar dado (valores, datas, número de pessoas), escreva um marcador entre colchetes, por exemplo [COMPLETAR: número de famílias].",
+        "Use SOMENTE as informações cadastradas da organização, comprovadas no checklist ou contadas pela comunidade. Onde faltar dado (valores, datas, número de pessoas), escreva um marcador entre colchetes, por exemplo [COMPLETAR: número de famílias].",
         "Nunca invente nomes, CNPJ, telefones, endereços ou valores.",
         "Responda em HTML simples usando apenas as tags h2, h3, p, ul, li, ol, table, tr, th, td e strong. Não use markdown nem ```.",
       ].join(" "),
