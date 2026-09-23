@@ -58,6 +58,17 @@ type Edital = {
 
 type ItemAnalise = { requisito: string; situacao: "atendido" | "pendente" | "nao_localizado"; evidencia: string; orientacao: string };
 
+function checklistValido(valor: unknown): valor is ItemAnalise[] {
+  return Array.isArray(valor) && valor.every((item) => {
+    if (!item || typeof item !== "object") return false;
+    const dado = item as Record<string, unknown>;
+    return typeof dado.requisito === "string"
+      && (dado.situacao === "atendido" || dado.situacao === "pendente" || dado.situacao === "nao_localizado")
+      && typeof dado.evidencia === "string"
+      && typeof dado.orientacao === "string";
+  });
+}
+
 function NovoProjeto() {
   const navigate = useNavigate();
   const { user, carregando } = useAuth();
@@ -72,25 +83,64 @@ function NovoProjeto() {
   const [analiseId, setAnaliseId] = useState<string | null>(null);
   const [resumoAnalise, setResumoAnalise] = useState("");
   const [checklist, setChecklist] = useState<ItemAnalise[]>([]);
+  const [rascunhoCarregado, setRascunhoCarregado] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    const salvo = window.localStorage.getItem(`voz-do-mar:novo:${user.id}`);
-    if (!salvo) return;
-    try {
-      const dados = JSON.parse(salvo) as { editalId?: string; respostas?: string[]; checklist?: ItemAnalise[]; resumoAnalise?: string; analiseId?: string };
-      if (dados.editalId) setEditalId(dados.editalId);
-      if (dados.respostas?.length === PERGUNTAS.length) setRespostas(dados.respostas);
-      if (dados.checklist) setChecklist(dados.checklist);
-      if (dados.resumoAnalise) setResumoAnalise(dados.resumoAnalise);
-      if (dados.analiseId) setAnaliseId(dados.analiseId);
-    } catch { window.localStorage.removeItem(`voz-do-mar:novo:${user.id}`); }
+    let ativo = true;
+    const chave = `voz-do-mar:novo:${user.id}`;
+
+    async function carregarRascunho() {
+      const salvo = window.localStorage.getItem(chave);
+      if (salvo) {
+        try {
+          const dados = JSON.parse(salvo) as {
+            etapa?: number; indice?: number; editalId?: string; respostas?: string[];
+            checklist?: unknown; resumoAnalise?: string; analiseId?: string;
+          };
+          if (dados.editalId) setEditalId(dados.editalId);
+          if (dados.respostas?.length === PERGUNTAS.length) setRespostas(dados.respostas);
+          if (checklistValido(dados.checklist) && dados.checklist.length > 0) {
+            setChecklist(dados.checklist);
+            setEtapa(typeof dados.etapa === "number" ? Math.max(1, Math.min(3, dados.etapa)) : 1);
+          }
+          if (typeof dados.indice === "number") setIndice(Math.max(0, Math.min(PERGUNTAS.length - 1, dados.indice)));
+          if (dados.resumoAnalise) setResumoAnalise(dados.resumoAnalise);
+          if (dados.analiseId) setAnaliseId(dados.analiseId);
+          if (dados.editalId && checklistValido(dados.checklist) && dados.checklist.length > 0) {
+            if (ativo) setRascunhoCarregado(true);
+            return;
+          }
+        } catch {
+          window.localStorage.removeItem(chave);
+        }
+      }
+
+      const { data } = await supabase
+        .from("analises_editais")
+        .select("id, edital_id, checklist, resumo")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!ativo) return;
+      if (data && checklistValido(data.checklist) && data.checklist.length > 0) {
+        setEditalId(data.edital_id);
+        setAnaliseId(data.id);
+        setChecklist(data.checklist);
+        setResumoAnalise(data.resumo ?? "");
+        setEtapa(1);
+      }
+      setRascunhoCarregado(true);
+    }
+
+    void carregarRascunho();
+    return () => { ativo = false; };
   }, [user]);
 
   useEffect(() => {
-    if (!user) return;
-    window.localStorage.setItem(`voz-do-mar:novo:${user.id}`, JSON.stringify({ editalId, respostas, checklist, resumoAnalise, analiseId }));
-  }, [user, editalId, respostas, checklist, resumoAnalise, analiseId]);
+    if (!user || !rascunhoCarregado) return;
+    window.localStorage.setItem(`voz-do-mar:novo:${user.id}`, JSON.stringify({ etapa, indice, editalId, respostas, checklist, resumoAnalise, analiseId }));
+  }, [user, rascunhoCarregado, etapa, indice, editalId, respostas, checklist, resumoAnalise, analiseId]);
 
   const transcrever = useServerFn(transcreverAudio);
   const importarEdital = useServerFn(lerEdital);
