@@ -10,3 +10,7 @@
 - [x] Validar páginas públicas e proteção das áreas privadas no navegador
 - [x] Validar cadastro, anexo e retomada do checklist com uma conta confirmada
 - [ ] Validar respostas por voz e geração final do projeto (aguarda respostas do usuário)
+- [ ] Exigir aprovação administrativa para novos cadastros
+- [ ] Criar área para aprovar ou recusar cadastros
+- [ ] Permitir gerar e escolher ideias compatíveis com o edital
+- [ ] Validar aprovação e sugestões no navegador
