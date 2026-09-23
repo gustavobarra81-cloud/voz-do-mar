@@ -8,4 +8,5 @@
 - [x] Integrar cadastro, checklist e voz na geração do projeto
 - [x] Atualizar navegação e redirecionamentos após entrar
 - [x] Validar páginas públicas e proteção das áreas privadas no navegador
-- [ ] Validar cadastro, anexos, checklist e geração com uma conta confirmada (aguarda a primeira conta)
+- [x] Validar cadastro, anexo e retomada do checklist com uma conta confirmada
+- [ ] Validar respostas por voz e geração final do projeto (aguarda respostas do usuário)
