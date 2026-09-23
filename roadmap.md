@@ -7,4 +7,5 @@
 - [x] Reorganizar envio do edital e checklist de compatibilidade
 - [x] Integrar cadastro, checklist e voz na geração do projeto
 - [x] Atualizar navegação e redirecionamentos após entrar
-- [ ] Validar fluxo principal no navegador
+- [x] Validar páginas públicas e proteção das áreas privadas no navegador
+- [ ] Validar cadastro, anexos, checklist e geração com uma conta confirmada (aguarda a primeira conta)
