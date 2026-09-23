@@ -137,6 +137,57 @@ export const lerEdital = createServerFn({ method: "POST" })
   });
 
 /* ------------------------------------------------------------------ */
+/* Comparar edital e organização                                       */
+/* ------------------------------------------------------------------ */
+
+const AnaliseInput = z.object({
+  edital: z.object({
+    titulo: z.string(), orgao: z.string().nullable(), resumo: z.string().nullable(),
+    exigencias: z.string().nullable(), valor_maximo: z.string().nullable(), prazo: z.string().nullable(),
+  }),
+  organizacao: z.record(z.string(), z.unknown()),
+  documentos: z.array(z.object({ categoria: z.string(), nome: z.string(), data_validade: z.string().nullable() })),
+});
+
+export const analisarEdital = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => AnaliseInput.parse(input))
+  .handler(async ({ data }) => {
+    const lovable = criarModelo(pegarChave());
+    const resultado = streamText({
+      model: lovable.responses("openai/gpt-6-astra"),
+      providerOptions: opcoesRaciocinio,
+      system: [
+        "Você confere editais brasileiros para organizações comunitárias.",
+        "Não dê parecer jurídico e não diga simplesmente se a organização pode ou não concorrer.",
+        "Compare cada requisito com as informações fornecidas. Nunca presuma nem invente uma comprovação.",
+        "Responda somente JSON válido, sem markdown.",
+      ].join(" "),
+      prompt: [
+        "Gere JSON neste formato:",
+        '{"resumo":"frase simples","itens":[{"requisito":"","situacao":"atendido|pendente|nao_localizado","evidencia":"","orientacao":""}]}',
+        "EDITAL:", JSON.stringify(data.edital),
+        "ORGANIZAÇÃO:", JSON.stringify(data.organizacao),
+        "DOCUMENTOS (considere vencidos os que tiverem validade anterior à data atual):", JSON.stringify(data.documentos),
+        "Separe todos os requisitos de participação, documentos, regularidade, território, experiência, prazo, contrapartida e impedimentos.",
+      ].join("\n"),
+    });
+    const texto = (await resultado.text).replace(/```json|```/g, "").trim();
+    try {
+      const inicio = texto.indexOf("{"); const fim = texto.lastIndexOf("}");
+      return z.object({
+        resumo: z.string(),
+        itens: z.array(z.object({
+          requisito: z.string(), situacao: z.enum(["atendido", "pendente", "nao_localizado"]),
+          evidencia: z.string(), orientacao: z.string(),
+        })),
+      }).parse(JSON.parse(texto.slice(inicio, fim + 1)));
+    } catch {
+      throw new Error("Não conseguimos montar o checklist desse edital. Tente novamente.");
+    }
+  });
+
+/* ------------------------------------------------------------------ */
 /* Escrever o projeto                                                   */
 /* ------------------------------------------------------------------ */
 
@@ -146,6 +197,8 @@ const ProjetoInput = z.object({
   editalResumo: z.string().nullable(),
   editalExigencias: z.string().nullable(),
   editalValor: z.string().nullable(),
+  organizacao: z.record(z.string(), z.unknown()),
+  checklist: z.array(z.object({ requisito: z.string(), situacao: z.string(), evidencia: z.string(), orientacao: z.string() })),
   respostas: z.array(z.object({ pergunta: z.string(), resposta: z.string() })).min(1),
 });
 
@@ -177,6 +230,8 @@ export const escreverProjeto = createServerFn({ method: "POST" })
         data.editalResumo ? `SOBRE O EDITAL: ${data.editalResumo}` : "",
         data.editalValor ? `VALOR: ${data.editalValor}` : "",
         data.editalExigencias ? `EXIGÊNCIAS DO EDITAL: ${data.editalExigencias}` : "",
+        `DADOS CADASTRADOS DA ORGANIZAÇÃO: ${JSON.stringify(data.organizacao)}`,
+        `CHECKLIST DA ANÁLISE: ${JSON.stringify(data.checklist)}`,
         "",
         "O QUE A COMUNIDADE CONTOU (transcrição da fala):",
         falas,
