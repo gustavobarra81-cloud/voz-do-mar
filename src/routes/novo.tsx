@@ -62,10 +62,10 @@ function checklistValido(valor: unknown): valor is ItemAnalise[] {
   return Array.isArray(valor) && valor.every((item) => {
     if (!item || typeof item !== "object") return false;
     const dado = item as Record<string, unknown>;
-    return typeof dado.requisito === "string"
-      && (dado.situacao === "atendido" || dado.situacao === "pendente" || dado.situacao === "nao_localizado")
-      && typeof dado.evidencia === "string"
-      && typeof dado.orientacao === "string";
+    return typeof dado["requisito"] === "string"
+      && (dado["situacao"] === "atendido" || dado["situacao"] === "pendente" || dado["situacao"] === "nao_localizado")
+      && typeof dado["evidencia"] === "string"
+      && typeof dado["orientacao"] === "string";
   });
 }
 
