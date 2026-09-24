@@ -33,7 +33,7 @@ export const Route = createFileRoute("/entrar")({
 
 function Entrar() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, carregando, approvalStatus } = useAuth();
   const [modo, setModo] = useState<"entrar" | "criar">("entrar");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -41,8 +41,8 @@ function Entrar() {
   const [ocupado, setOcupado] = useState(false);
 
   useEffect(() => {
-    if (user) void navigate({ to: "/organizacao" });
-  }, [user, navigate]);
+    if (!carregando && user) void navigate({ to: approvalStatus === "approved" ? "/organizacao" : "/aguardando" });
+  }, [user, carregando, approvalStatus, navigate]);
 
   async function enviar(evento: React.FormEvent) {
     evento.preventDefault();
@@ -58,11 +58,11 @@ function Entrar() {
           },
         });
         if (error) throw error;
-        toast.success("Conta criada! Confira seu e-mail para confirmar o cadastro.");
+        toast.success("Conta criada! Confirme seu e-mail. Depois, o cadastro seguirá para aprovação.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
         if (error) throw error;
-        void navigate({ to: "/organizacao" });
+        void navigate({ to: "/aguardando" });
       }
     } catch (erro) {
       toast.error(erro instanceof Error ? erro.message : "Não deu certo. Tente de novo.");
@@ -80,7 +80,7 @@ function Entrar() {
       return;
     }
     if (resultado.redirected) return;
-    void navigate({ to: "/organizacao" });
+    void navigate({ to: "/aguardando" });
   }
 
   return (
@@ -93,7 +93,7 @@ function Entrar() {
               {modo === "entrar" ? "Entrar" : "Criar conta"}
             </CardTitle>
             <CardDescription className="text-base">
-              Sua conta guarda os projetos da comunidade para você continuar depois.
+              Novos cadastros são liberados após aprovação da equipe responsável.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
