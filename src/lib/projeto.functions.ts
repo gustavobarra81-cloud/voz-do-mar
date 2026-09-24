@@ -2,7 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1";
 
@@ -23,9 +25,9 @@ function pegarChave() {
   return key;
 }
 
-async function exigirAprovacao(context: { supabase: { from: (table: "profiles") => { select: (columns: string) => { eq: (column: string, value: string) => { maybeSingle: () => Promise<{ data: { approval_status?: string } | null }> } } } }; userId: string }) {
-  const { data } = await context.supabase.from("profiles").select("approval_status").eq("id", context.userId).maybeSingle();
-  if (data?.approval_status !== "approved") throw new Error("Seu cadastro ainda precisa ser aprovado.");
+async function exigirAprovacao(context: { supabase: SupabaseClient<Database>; userId: string }) {
+  const { data } = await context.supabase.rpc("is_approved", { _user_id: context.userId });
+  if (!data) throw new Error("Seu cadastro ainda precisa ser aprovado.");
 }
 
 const opcoesRaciocinio = {

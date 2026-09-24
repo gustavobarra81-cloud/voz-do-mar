@@ -21,7 +21,8 @@ export function useAuth() {
         supabase.from("profiles").select("approval_status").eq("id", novaSessao.user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", novaSessao.user.id).eq("role", "admin").maybeSingle(),
       ]);
-      setApprovalStatus(perfil?.approval_status ?? "pending");
+      const status = perfil?.approval_status;
+      setApprovalStatus(status === "approved" || status === "rejected" ? status : "pending");
       setIsAdmin(papel?.role === "admin");
       setCarregando(false);
     }
