@@ -23,6 +23,11 @@ function pegarChave() {
   return key;
 }
 
+async function exigirAprovacao(context: { supabase: { from: (table: "profiles") => { select: (columns: string) => { eq: (column: string, value: string) => { maybeSingle: () => Promise<{ data: { approval_status?: string } | null }> } } } }; userId: string }) {
+  const { data } = await context.supabase.from("profiles").select("approval_status").eq("id", context.userId).maybeSingle();
+  if (data?.approval_status !== "approved") throw new Error("Seu cadastro ainda precisa ser aprovado.");
+}
+
 const opcoesRaciocinio = {
   openai: {
     forceReasoning: true,
@@ -42,7 +47,8 @@ export const transcreverAudio = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ audioBase64: z.string().min(100) }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await exigirAprovacao(context);
     const apiKey = pegarChave();
     const bytes = Uint8Array.from(atob(data.audioBase64), (c) => c.charCodeAt(0));
     if (bytes.byteLength < 4000) {
@@ -85,7 +91,8 @@ const EditalInput = z.object({
 export const lerEdital = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => EditalInput.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await exigirAprovacao(context);
     const apiKey = pegarChave();
     const lovable = criarModelo(apiKey);
 
@@ -152,7 +159,8 @@ const AnaliseInput = z.object({
 export const analisarEdital = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => AnaliseInput.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await exigirAprovacao(context);
     const lovable = criarModelo(pegarChave());
     const resultado = streamText({
       model: lovable.responses("openai/gpt-6-astra"),
@@ -188,6 +196,52 @@ export const analisarEdital = createServerFn({ method: "POST" })
   });
 
 /* ------------------------------------------------------------------ */
+/* Sugerir ideias compatíveis                                           */
+/* ------------------------------------------------------------------ */
+
+const IdeiasInput = z.object({
+  edital: z.object({ titulo: z.string(), orgao: z.string().nullable(), resumo: z.string().nullable(), exigencias: z.string().nullable(), valor_maximo: z.string().nullable() }),
+  organizacao: z.record(z.string(), z.unknown()),
+  checklist: z.array(z.object({ requisito: z.string(), situacao: z.string(), evidencia: z.string(), orientacao: z.string() })),
+});
+
+export const sugerirIdeias = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => IdeiasInput.parse(input))
+  .handler(async ({ data, context }) => {
+    await exigirAprovacao(context);
+    const lovable = criarModelo(pegarChave());
+    const resultado = streamText({
+      model: lovable.responses("openai/gpt-6-astra"),
+      providerOptions: opcoesRaciocinio,
+      system: [
+        "Você ajuda organizações de pesca artesanal a imaginar projetos viáveis para editais brasileiros.",
+        "Crie sugestões diferentes entre si e compatíveis com o edital e com as capacidades comprovadas da organização.",
+        "Nunca invente experiência, parceria, estrutura, quantidade de pessoas, orçamento ou recurso disponível.",
+        "O que depender de confirmação deve aparecer em recursos_confirmar.",
+        "Responda somente JSON válido, sem markdown.",
+      ].join(" "),
+      prompt: [
+        'Gere exatamente 3 ideias no formato: {"ideias":[{"titulo":"","objetivo":"","problema":"","publico":"","atividades":[""],"resultados":[""],"relacao_edital":"","recursos_confirmar":[""]}]}',
+        `EDITAL: ${JSON.stringify(data.edital)}`,
+        `ORGANIZAÇÃO: ${JSON.stringify(data.organizacao)}`,
+        `CHECKLIST: ${JSON.stringify(data.checklist)}`,
+        "Use linguagem simples, concreta e respeitosa. Não trate a sugestão como fato já decidido pela comunidade.",
+      ].join("\n"),
+    });
+    const texto = (await resultado.text).replace(/```json|```/g, "").trim();
+    try {
+      const inicio = texto.indexOf("{"); const fim = texto.lastIndexOf("}");
+      return z.object({ ideias: z.array(z.object({
+        titulo: z.string(), objetivo: z.string(), problema: z.string(), publico: z.string(),
+        atividades: z.array(z.string()), resultados: z.array(z.string()), relacao_edital: z.string(), recursos_confirmar: z.array(z.string()),
+      })).length(3) }).parse(JSON.parse(texto.slice(inicio, fim + 1)));
+    } catch {
+      throw new Error("Não conseguimos montar as ideias agora. Tente novamente.");
+    }
+  });
+
+/* ------------------------------------------------------------------ */
 /* Escrever o projeto                                                   */
 /* ------------------------------------------------------------------ */
 
@@ -205,7 +259,8 @@ const ProjetoInput = z.object({
 export const escreverProjeto = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ProjetoInput.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await exigirAprovacao(context);
     const apiKey = pegarChave();
     const lovable = criarModelo(apiKey);
 
