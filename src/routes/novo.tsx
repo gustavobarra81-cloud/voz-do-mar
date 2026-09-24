@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, FileUp, HelpCircle, Loader2, Pencil } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, FileUp, HelpCircle, Lightbulb, Loader2, Pencil, Sparkles } from "lucide-react";
 import { Cabecalho } from "@/components/Cabecalho";
 import { BotaoGravar } from "@/components/BotaoGravar";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/useAuth";
-import { analisarEdital, escreverProjeto, lerEdital, transcreverAudio } from "@/lib/projeto.functions";
+import { analisarEdital, escreverProjeto, lerEdital, sugerirIdeias, transcreverAudio } from "@/lib/projeto.functions";
 
 export const Route = createFileRoute("/novo")({
   head: () => ({
@@ -57,6 +57,7 @@ type Edital = {
 };
 
 type ItemAnalise = { requisito: string; situacao: "atendido" | "pendente" | "nao_localizado"; evidencia: string; orientacao: string };
+type Ideia = { titulo: string; objetivo: string; problema: string; publico: string; atividades: string[]; resultados: string[]; relacao_edital: string; recursos_confirmar: string[] };
 
 function checklistValido(valor: unknown): valor is ItemAnalise[] {
   return Array.isArray(valor) && valor.every((item) => {
@@ -84,6 +85,8 @@ function NovoProjeto() {
   const [resumoAnalise, setResumoAnalise] = useState("");
   const [checklist, setChecklist] = useState<ItemAnalise[]>([]);
   const [rascunhoCarregado, setRascunhoCarregado] = useState(false);
+  const [ideias, setIdeias] = useState<Ideia[]>([]);
+  const [gerandoIdeias, setGerandoIdeias] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -146,6 +149,7 @@ function NovoProjeto() {
   const importarEdital = useServerFn(lerEdital);
   const gerar = useServerFn(escreverProjeto);
   const analisar = useServerFn(analisarEdital);
+  const sugerir = useServerFn(sugerirIdeias);
 
   useEffect(() => {
     if (!carregando && !user) void navigate({ to: "/entrar" });
@@ -258,6 +262,36 @@ function NovoProjeto() {
     } finally {
       setTranscrevendo(false);
     }
+  }
+
+  async function buscarIdeias() {
+    if (!editalEscolhido || !organizacao) return;
+    setGerandoIdeias(true);
+    try {
+      const resultado = await sugerir({ data: {
+        edital: { titulo: editalEscolhido.titulo, orgao: editalEscolhido.orgao, resumo: editalEscolhido.resumo, exigencias: editalEscolhido.exigencias, valor_maximo: editalEscolhido.valor_maximo },
+        organizacao,
+        checklist,
+      } });
+      setIdeias(resultado.ideias);
+    } catch (erro) {
+      toast.error(erro instanceof Error ? erro.message : "Não conseguimos sugerir ideias agora.");
+    } finally {
+      setGerandoIdeias(false);
+    }
+  }
+
+  function escolherIdeia(ideia: Ideia) {
+    setRespostas([
+      `${organizacao?.nome_fantasia || organizacao?.razao_social || "Nossa organização"}, da comunidade ${organizacao?.comunidade || "[COMPLETAR: comunidade]"}.`,
+      ideia.problema,
+      `${ideia.objetivo}\n\nAtividades sugeridas: ${ideia.atividades.join("; ")}.`,
+      `${ideia.publico}. Resultados esperados: ${ideia.resultados.join("; ")}.`,
+      ideia.recursos_confirmar.length > 0 ? `Precisamos confirmar: ${ideia.recursos_confirmar.join("; ")}.` : "[COMPLETAR: recursos que a organização já possui e o que precisará contratar ou comprar]",
+    ]);
+    setIndice(0);
+    setEtapa(2);
+    toast.success("Ideia escolhida. Agora você pode completar ou corrigir falando.");
   }
 
   async function finalizar() {
@@ -396,7 +430,12 @@ function NovoProjeto() {
               return <Card key={`${item.requisito}-${i}`}><CardContent className="py-5"><div className="flex items-start gap-3"><visual.Icone className={`mt-1 size-5 shrink-0 ${visual.classe}`} /><div><p className="font-bold">{item.requisito}</p><p className={`text-sm font-bold ${visual.classe}`}>{visual.texto}</p>{item.evidencia && <p className="mt-2 text-sm">{item.evidencia}</p>}{item.orientacao && <p className="mt-1 text-sm text-muted-foreground">{item.orientacao}</p>}</div></div></CardContent></Card>;
             })}</div>
             <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">Este checklist ajuda na conferência, mas não substitui a validação do órgão responsável ou uma orientação jurídica.</p>
-            <div className="flex gap-3"><Button variant="outline" className="h-14 flex-1" onClick={() => setEtapa(0)}><ArrowLeft className="mr-2 size-5" />Trocar edital</Button><Button className="h-14 flex-1" onClick={() => setEtapa(2)}>Contar minha ideia<ArrowRight className="ml-2 size-5" /></Button></div>
+            <section className="space-y-4 border-t pt-6">
+              <div><h2 className="flex items-center gap-2 text-2xl font-bold"><Lightbulb className="size-6 text-primary" />Como quer começar?</h2><p className="mt-1 text-muted-foreground">Você pode contar uma ideia que já tem ou receber sugestões baseadas neste edital.</p></div>
+              <div className="grid gap-3 sm:grid-cols-2"><Button variant="outline" className="h-16 text-base" onClick={() => setEtapa(2)}><Pencil className="mr-2 size-5" />Já tenho uma ideia</Button><Button className="h-16 text-base" disabled={gerandoIdeias} onClick={() => void buscarIdeias()}>{gerandoIdeias ? <Loader2 className="mr-2 size-5 animate-spin" /> : <Sparkles className="mr-2 size-5" />}Sugerir ideias</Button></div>
+              {ideias.length > 0 && <div className="space-y-3"><h3 className="text-lg font-bold">Escolha uma ideia para adaptar</h3>{ideias.map((ideia) => <Card key={ideia.titulo} className="border-2"><CardContent className="space-y-3 py-5"><h3 className="text-xl font-bold">{ideia.titulo}</h3><p>{ideia.objetivo}</p><p className="text-sm text-muted-foreground"><strong>Ligação com o edital:</strong> {ideia.relacao_edital}</p><div><p className="text-sm font-bold">Atividades possíveis</p><ul className="list-disc space-y-1 pl-5 text-sm">{ideia.atividades.map((atividade) => <li key={atividade}>{atividade}</li>)}</ul></div><Button className="w-full" onClick={() => escolherIdeia(ideia)}>Escolher e adaptar esta ideia <ArrowRight className="ml-2 size-4" /></Button></CardContent></Card>)}</div>}
+              <Button variant="ghost" className="w-full" onClick={() => setEtapa(0)}><ArrowLeft className="mr-2 size-5" />Trocar edital</Button>
+            </section>
           </section>
         )}
 

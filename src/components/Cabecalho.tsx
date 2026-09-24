@@ -1,12 +1,18 @@
-import { Link, useNavigate } from "@tanstack/react-router";
-import { Anchor, Building2, FileCheck2, FileText, FolderOpen, LogOut } from "lucide-react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { Anchor, Building2, FileCheck2, FileText, FolderOpen, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/useAuth";
 
 export function Cabecalho() {
-  const { user } = useAuth();
+  const { user, carregando, aprovado, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+
+  useEffect(() => {
+    if (!carregando && user && !aprovado && pathname !== "/aguardando") void navigate({ to: "/aguardando" });
+  }, [carregando, user, aprovado, pathname, navigate]);
 
   return (
     <header className="nao-imprimir border-b border-border bg-card/80 backdrop-blur">
@@ -19,7 +25,7 @@ export function Cabecalho() {
         </Link>
 
         <nav className="flex items-center gap-1">
-          {user ? (
+          {user && aprovado ? (
             <>
               <Button asChild variant="ghost" className="hidden text-base md:inline-flex">
                 <Link to="/organizacao"><Building2 className="mr-2 size-4" /> Organização</Link>
@@ -33,6 +39,7 @@ export function Cabecalho() {
               <Button asChild variant="ghost" className="hidden text-base sm:inline-flex">
                 <Link to="/projetos">Meus projetos</Link>
               </Button>
+              {isAdmin && <Button asChild variant="ghost" className="hidden text-base xl:inline-flex"><Link to="/admin"><ShieldCheck className="mr-2 size-4" />Aprovações</Link></Button>}
               <Button asChild variant="ghost" size="icon" className="md:hidden" aria-label="Minha organização">
                 <Link to="/organizacao"><FileCheck2 className="size-5" /></Link>
               </Button>
