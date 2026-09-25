@@ -15,5 +15,5 @@
 - [x] Criar área para aprovar ou recusar cadastros
 - [x] Permitir gerar e escolher ideias compatíveis com o edital
 - [x] Validar geração das sugestões no navegador
-- [ ] Mostrar contador de cadastros pendentes ao administrador
-- [ ] Permitir várias organizações por conta com documentos, editais e projetos separados
+- [x] Mostrar contador de cadastros pendentes ao administrador
+- [x] Permitir várias organizações por conta com documentos, editais e projetos separados

@@ -10,3 +10,4 @@
 <!-- LOVABLE:END -->
 
 - Uma conta pode possuir várias organizações; a seleção ativa é uma preferência local validada contra organizações do usuário, enquanto documentos, análises e projetos sempre usam o ID da organização selecionada. Isso impede misturar dados entre entidades.
+- O contador de aprovações consulta somente o número de perfis pendentes via RLS e atualiza periodicamente ou após uma decisão administrativa. Isso mantém a navegação sincronizada sem revelar cadastros a usuários comuns.
