@@ -22,7 +22,7 @@ export function useOrganizacoes() {
   });
   const organizacao = organizacoes.find((item) => item.id === escolhidaId) ?? organizacoes[0] ?? null;
   function escolher(id: string) {
-    if (!user || !organizacoes.some((item) => item.id === id)) return;
+    if (!user) return;
     window.localStorage.setItem(`voz-do-mar:organizacao:${user.id}`, id);
     setEscolhidaId(id);
     window.dispatchEvent(new Event("organizacao-alterada"));

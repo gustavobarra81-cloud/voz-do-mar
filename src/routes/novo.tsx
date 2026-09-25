@@ -99,7 +99,8 @@ function NovoProjeto() {
     const chave = `voz-do-mar:novo:${user.id}:${organizacaoAtual.id}`;
 
     async function carregarRascunho() {
-      const salvo = window.localStorage.getItem(chave);
+      const antigo = window.localStorage.getItem(`voz-do-mar:novo:${user.id}`);
+      const salvo = window.localStorage.getItem(chave) ?? (organizacoesDoUsuario === 1 ? antigo : null);
       if (salvo) {
         try {
           const dados = JSON.parse(salvo) as {
@@ -115,6 +116,7 @@ function NovoProjeto() {
              setIndice(typeof dados.indice === "number" ? Math.max(0, Math.min(PERGUNTAS.length - 1, dados.indice)) : 0);
              setResumoAnalise(dados.resumoAnalise ?? "");
              setEtapa(typeof dados.etapa === "number" ? Math.max(1, Math.min(3, dados.etapa)) : 1);
+             if (antigo && !window.localStorage.getItem(chave)) window.localStorage.removeItem(`voz-do-mar:novo:${user.id}`);
              setRascunhoCarregado(true);
             return;
           }
