@@ -8,6 +8,9 @@ export function useOrganizacoes() {
   const [escolhidaId, setEscolhidaId] = useState<string | null>(null);
   useEffect(() => {
     setEscolhidaId(user ? window.localStorage.getItem(`voz-do-mar:organizacao:${user.id}`) : null);
+    const sincronizar = () => setEscolhidaId(user ? window.localStorage.getItem(`voz-do-mar:organizacao:${user.id}`) : null);
+    window.addEventListener("organizacao-alterada", sincronizar);
+    return () => window.removeEventListener("organizacao-alterada", sincronizar);
   }, [user?.id]);
   const { data: organizacoes = [], isLoading, refetch } = useQuery({
     enabled: Boolean(user), queryKey: ["organizacoes", user?.id],
@@ -22,6 +25,7 @@ export function useOrganizacoes() {
     if (!user || !organizacoes.some((item) => item.id === id)) return;
     window.localStorage.setItem(`voz-do-mar:organizacao:${user.id}`, id);
     setEscolhidaId(id);
+    window.dispatchEvent(new Event("organizacao-alterada"));
   }
   return { organizacoes, organizacao, isLoading, refetchOrganizacoes: refetch, escolher };
 }
