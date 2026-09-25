@@ -1,5 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Anchor, Building2, FileCheck2, FileText, FolderOpen, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +10,10 @@ export function Cabecalho() {
   const { user, carregando, aprovado, isAdmin } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const { data: pendentes } = useQuery({
+    enabled: Boolean(user && isAdmin), queryKey: ["pendentes-aprovacao"], refetchInterval: 60000,
+    queryFn: async () => { const { count, error } = await supabase.from("profiles").select("id", { count: "exact", head: true }).eq("approval_status", "pending"); if (error) throw error; return count ?? 0; },
+  });
 
   useEffect(() => {
     if (!carregando && user && !aprovado && pathname !== "/aguardando") void navigate({ to: "/aguardando" });
@@ -28,7 +33,7 @@ export function Cabecalho() {
           {user && aprovado ? (
             <>
               <Button asChild variant="ghost" className="hidden text-base md:inline-flex">
-                <Link to="/organizacao"><Building2 className="mr-2 size-4" /> Organização</Link>
+                <Link to="/organizacao" search={{ nova: false }}><Building2 className="mr-2 size-4" /> Organização</Link>
               </Button>
               <Button asChild variant="ghost" className="hidden text-base md:inline-flex">
                 <Link to="/documentos"><FolderOpen className="mr-2 size-4" /> Documentos</Link>
@@ -39,9 +44,9 @@ export function Cabecalho() {
               <Button asChild variant="ghost" className="hidden text-base sm:inline-flex">
                 <Link to="/projetos">Meus projetos</Link>
               </Button>
-              {isAdmin && <Button asChild variant="ghost" className="hidden text-base xl:inline-flex"><Link to="/admin"><ShieldCheck className="mr-2 size-4" />Aprovações</Link></Button>}
+               {isAdmin && <Button asChild variant="ghost" className="text-base"><Link to="/admin" aria-label={`Aprovações: ${pendentes ?? 0} cadastros pendentes`}><ShieldCheck className="size-5 xl:mr-2" /><span className="hidden xl:inline">Aprovações</span>{Boolean(pendentes) && <span className="ml-1 flex min-w-6 items-center justify-center rounded-full bg-destructive px-1 text-xs font-bold text-destructive-foreground">{pendentes}</span>}</Link></Button>}
               <Button asChild variant="ghost" size="icon" className="md:hidden" aria-label="Minha organização">
-                <Link to="/organizacao"><FileCheck2 className="size-5" /></Link>
+                 <Link to="/organizacao" search={{ nova: false }}><FileCheck2 className="size-5" /></Link>
               </Button>
               <Button
                 variant="ghost"
