@@ -56,6 +56,7 @@ type Edital = {
   valor_maximo: string | null;
   prazo: string | null;
   arquivo_path?: string | null;
+  organizacao_id: string | null;
 };
 
 type ItemAnalise = { requisito: string; situacao: "atendido" | "pendente" | "nao_localizado"; evidencia: string; orientacao: string };
@@ -113,7 +114,10 @@ function NovoProjeto() {
           if (typeof dados.indice === "number") setIndice(Math.max(0, Math.min(PERGUNTAS.length - 1, dados.indice)));
           if (dados.resumoAnalise) setResumoAnalise(dados.resumoAnalise);
           if (dados.analiseId) setAnaliseId(dados.analiseId);
-          if (dados.editalId && checklistValido(dados.checklist) && dados.checklist.length > 0) {
+          const { data: analiseSalva } = dados.analiseId
+            ? await supabase.from("analises_editais").select("id").eq("id", dados.analiseId).eq("organizacao_id", organizacao.id).eq("edital_id", dados.editalId ?? "").maybeSingle()
+            : { data: null };
+          if (analiseSalva && dados.editalId && checklistValido(dados.checklist) && dados.checklist.length > 0) {
             if (ativo) setRascunhoCarregado(true);
             return;
           }
@@ -165,7 +169,7 @@ function NovoProjeto() {
   }, [carregando, user, navigate]);
 
   const { data: editais, refetch } = useQuery({
-    queryKey: ["editais"],
+      queryKey: ["editais", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("editais")
