@@ -76,7 +76,7 @@ function checklistValido(valor: unknown): valor is ItemAnalise[] {
 function NovoProjeto() {
   const navigate = useNavigate();
   const { user, carregando } = useAuth();
-  const { organizacao } = useOrganizacoes();
+  const { organizacao, organizacoes } = useOrganizacoes();
   const [etapa, setEtapa] = useState(0);
   const [editalId, setEditalId] = useState<string | null>(null);
   const [respostas, setRespostas] = useState<string[]>(() => PERGUNTAS.map(() => ""));
@@ -100,7 +100,7 @@ function NovoProjeto() {
 
     async function carregarRascunho() {
       const antigo = window.localStorage.getItem(`voz-do-mar:novo:${user.id}`);
-      const salvo = window.localStorage.getItem(chave) ?? (organizacoesDoUsuario === 1 ? antigo : null);
+      const salvo = window.localStorage.getItem(chave) ?? (organizacoes.length === 1 ? antigo : null);
       if (salvo) {
         try {
           const dados = JSON.parse(salvo) as {
@@ -116,7 +116,7 @@ function NovoProjeto() {
              setIndice(typeof dados.indice === "number" ? Math.max(0, Math.min(PERGUNTAS.length - 1, dados.indice)) : 0);
              setResumoAnalise(dados.resumoAnalise ?? "");
              setEtapa(typeof dados.etapa === "number" ? Math.max(1, Math.min(3, dados.etapa)) : 1);
-             if (antigo && !window.localStorage.getItem(chave)) window.localStorage.removeItem(`voz-do-mar:novo:${user.id}`);
+              if (antigo && !window.localStorage.getItem(chave)) window.localStorage.removeItem(`voz-do-mar:novo:${user.id}`);
              setRascunhoCarregado(true);
             return;
           }
@@ -145,7 +145,7 @@ function NovoProjeto() {
 
     void carregarRascunho();
     return () => { ativo = false; };
-  }, [user?.id, organizacao?.id]);
+  }, [user?.id, organizacao?.id, organizacoes.length]);
 
   function trocarOrganizacao() {
     setRascunhoCarregado(false); setEtapa(0); setEditalId(null); setAnaliseId(null);
