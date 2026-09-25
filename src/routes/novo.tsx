@@ -95,11 +95,12 @@ function NovoProjeto() {
   useEffect(() => {
     if (!user || !organizacao) return;
     let ativo = true;
+    const userId = user.id;
     const organizacaoAtual = organizacao;
-    const chave = `voz-do-mar:novo:${user.id}:${organizacaoAtual.id}`;
+    const chave = `voz-do-mar:novo:${userId}:${organizacaoAtual.id}`;
 
     async function carregarRascunho() {
-      const antigo = window.localStorage.getItem(`voz-do-mar:novo:${user.id}`);
+      const antigo = window.localStorage.getItem(`voz-do-mar:novo:${userId}`);
       const salvo = window.localStorage.getItem(chave) ?? (organizacoes.length === 1 ? antigo : null);
       if (salvo) {
         try {
@@ -116,7 +117,7 @@ function NovoProjeto() {
              setIndice(typeof dados.indice === "number" ? Math.max(0, Math.min(PERGUNTAS.length - 1, dados.indice)) : 0);
              setResumoAnalise(dados.resumoAnalise ?? "");
              setEtapa(typeof dados.etapa === "number" ? Math.max(1, Math.min(3, dados.etapa)) : 1);
-              if (antigo && !window.localStorage.getItem(chave)) window.localStorage.removeItem(`voz-do-mar:novo:${user.id}`);
+              if (antigo && !window.localStorage.getItem(chave)) window.localStorage.removeItem(`voz-do-mar:novo:${userId}`);
              setRascunhoCarregado(true);
             return;
           }
