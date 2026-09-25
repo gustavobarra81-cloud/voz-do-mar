@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/useAuth";
+import { useOrganizacoes } from "@/lib/useOrganizacoes";
+import { SeletorOrganizacao } from "@/components/SeletorOrganizacao";
 import { analisarEdital, escreverProjeto, lerEdital, sugerirIdeias, transcreverAudio } from "@/lib/projeto.functions";
 
 export const Route = createFileRoute("/novo")({
@@ -73,6 +75,7 @@ function checklistValido(valor: unknown): valor is ItemAnalise[] {
 function NovoProjeto() {
   const navigate = useNavigate();
   const { user, carregando } = useAuth();
+  const { organizacao } = useOrganizacoes();
   const [etapa, setEtapa] = useState(0);
   const [editalId, setEditalId] = useState<string | null>(null);
   const [respostas, setRespostas] = useState<string[]>(() => PERGUNTAS.map(() => ""));
@@ -89,9 +92,9 @@ function NovoProjeto() {
   const [gerandoIdeias, setGerandoIdeias] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !organizacao) return;
     let ativo = true;
-    const chave = `voz-do-mar:novo:${user.id}`;
+    const chave = `voz-do-mar:novo:${user.id}:${organizacao.id}`;
 
     async function carregarRascunho() {
       const salvo = window.localStorage.getItem(chave);
@@ -122,6 +125,7 @@ function NovoProjeto() {
       const { data } = await supabase
         .from("analises_editais")
         .select("id, edital_id, checklist, resumo")
+        .eq("organizacao_id", organizacao.id)
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -138,12 +142,17 @@ function NovoProjeto() {
 
     void carregarRascunho();
     return () => { ativo = false; };
-  }, [user]);
+  }, [user?.id, organizacao?.id]);
+
+  function trocarOrganizacao() {
+    setRascunhoCarregado(false); setEtapa(0); setEditalId(null); setAnaliseId(null);
+    setChecklist([]); setResumoAnalise(""); setRespostas(PERGUNTAS.map(() => "")); setIndice(0); setIdeias([]);
+  }
 
   useEffect(() => {
-    if (!user || !rascunhoCarregado) return;
-    window.localStorage.setItem(`voz-do-mar:novo:${user.id}`, JSON.stringify({ etapa, indice, editalId, respostas, checklist, resumoAnalise, analiseId }));
-  }, [user, rascunhoCarregado, etapa, indice, editalId, respostas, checklist, resumoAnalise, analiseId]);
+    if (!user || !organizacao || !rascunhoCarregado) return;
+    window.localStorage.setItem(`voz-do-mar:novo:${user.id}:${organizacao.id}`, JSON.stringify({ etapa, indice, editalId, respostas, checklist, resumoAnalise, analiseId }));
+  }, [user?.id, organizacao?.id, rascunhoCarregado, etapa, indice, editalId, respostas, checklist, resumoAnalise, analiseId]);
 
   const transcrever = useServerFn(transcreverAudio);
   const importarEdital = useServerFn(lerEdital);
@@ -160,26 +169,22 @@ function NovoProjeto() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("editais")
-        .select("id, titulo, orgao, resumo, exigencias, valor_maximo, prazo, arquivo_path")
+        .select("id, titulo, orgao, resumo, exigencias, valor_maximo, prazo, arquivo_path, organizacao_id")
+        .or(`publico.eq.true,criado_por.eq.${user?.id ?? "00000000-0000-0000-0000-000000000000"}`)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Edital[];
     },
   });
 
-  const { data: organizacao } = useQuery({
-    enabled: Boolean(user), queryKey: ["organizacao", user?.id],
-    queryFn: async () => { const { data, error } = await supabase.from("organizacoes").select("*").maybeSingle(); if (error) throw error; return data; },
-  });
-
   const { data: documentos } = useQuery({
     enabled: Boolean(organizacao), queryKey: ["documentos", organizacao?.id],
-    queryFn: async () => { const { data, error } = await supabase.from("documentos_organizacao").select("categoria, nome, data_validade"); if (error) throw error; return data; },
+    queryFn: async () => { const { data, error } = await supabase.from("documentos_organizacao").select("categoria, nome, data_validade").eq("organizacao_id", organizacao?.id ?? ""); if (error) throw error; return data; },
   });
 
   const editalEscolhido = useMemo(
-    () => editais?.find((e) => e.id === editalId) ?? null,
-    [editais, editalId],
+    () => editais?.find((e) => e.id === editalId && (e.organizacao_id === organizacao?.id || !e.organizacao_id)) ?? null,
+    [editais, editalId, organizacao?.id],
   );
 
   async function enviarPdf(arquivo: File) {
@@ -331,7 +336,7 @@ function NovoProjeto() {
         .single();
       if (error) throw error;
 
-      window.localStorage.removeItem(`voz-do-mar:novo:${user.id}`);
+      window.localStorage.removeItem(`voz-do-mar:novo:${user.id}:${organizacao.id}`);
       void navigate({ to: "/projetos/$id", params: { id: data.id } });
     } catch (erro) {
       toast.error(erro instanceof Error ? erro.message : "Não conseguimos escrever o projeto.");
@@ -346,6 +351,7 @@ function NovoProjeto() {
     <div className="min-h-screen surface-wave">
       <Cabecalho />
       <main className="mx-auto max-w-2xl px-4 py-8">
+        <div className="mb-6"><SeletorOrganizacao onChange={trocarOrganizacao} /></div>
         {etapa === 0 && (
           <section className="space-y-5">
             <p className="font-bold text-primary">Passo 3 de 4</p>
@@ -357,11 +363,11 @@ function NovoProjeto() {
             {!organizacao && <Card className="border-2 border-destructive/40"><CardContent className="space-y-3 py-6"><p className="font-bold">Cadastre sua organização antes de continuar.</p><Button asChild><a href="/organizacao">Fazer cadastro</a></Button></CardContent></Card>}
 
             <div className="space-y-3">
-              {editais?.map((edital) => (
+               {editais?.filter((edital) => !edital.organizacao_id || edital.organizacao_id === organizacao?.id).map((edital) => (
                 <button
                   key={edital.id}
                   type="button"
-                  onClick={() => setEditalId(edital.id)}
+                   onClick={() => setEditalId(edital.id)}
                   className={`w-full rounded-2xl border-2 p-5 text-left transition-colors ${
                     editalId === edital.id
                       ? "border-primary bg-secondary"
@@ -413,7 +419,7 @@ function NovoProjeto() {
             <Button
               size="lg"
               className="h-16 w-full text-lg font-bold"
-              disabled={!editalId || !organizacao || analisando}
+               disabled={!editalEscolhido || !organizacao || analisando}
               onClick={() => void analisarCompatibilidade()}
             >
               {analisando ? <><Loader2 className="mr-2 size-5 animate-spin" />Comparando requisitos...</> : <>Ver checklist <ArrowRight className="ml-2 size-5" /></>}

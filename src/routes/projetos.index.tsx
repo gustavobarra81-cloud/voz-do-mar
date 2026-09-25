@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/useAuth";
+import { useOrganizacoes } from "@/lib/useOrganizacoes";
+import { SeletorOrganizacao } from "@/components/SeletorOrganizacao";
 
 export const Route = createFileRoute("/projetos/")({
   head: () => ({
@@ -31,18 +33,20 @@ export const Route = createFileRoute("/projetos/")({
 function ListaProjetos() {
   const navigate = useNavigate();
   const { user, carregando } = useAuth();
+  const { organizacao } = useOrganizacoes();
 
   useEffect(() => {
     if (!carregando && !user) void navigate({ to: "/entrar" });
   }, [carregando, user, navigate]);
 
   const { data: projetos, isLoading } = useQuery({
-    enabled: Boolean(user),
-    queryKey: ["projetos", user?.id],
+    enabled: Boolean(user && organizacao),
+    queryKey: ["projetos", user?.id, organizacao?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projetos")
         .select("id, titulo, created_at, status")
+        .eq("organizacao_id", organizacao?.id ?? "")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -61,6 +65,8 @@ function ListaProjetos() {
             </Link>
           </Button>
         </div>
+
+        <SeletorOrganizacao />
 
         {isLoading && <p className="text-muted-foreground">Carregando...</p>}
 
