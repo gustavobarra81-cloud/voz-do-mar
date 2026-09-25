@@ -9,8 +9,9 @@
 - [x] Atualizar navegação e redirecionamentos após entrar
 - [x] Validar páginas públicas e proteção das áreas privadas no navegador
 - [x] Validar cadastro, anexo e retomada do checklist com uma conta confirmada
-- [ ] Validar respostas por voz e geração final do projeto (aguarda respostas do usuário)
+- [x] Validar respostas preenchidas e geração final do projeto
+- [ ] Validar captação real pelo microfone (requer interação do usuário no dispositivo)
 - [x] Exigir aprovação administrativa para novos cadastros
 - [x] Criar área para aprovar ou recusar cadastros
 - [x] Permitir gerar e escolher ideias compatíveis com o edital
-- [ ] Validar geração das sugestões no navegador (bloqueada por falta de créditos de IA)
+- [x] Validar geração das sugestões no navegador
