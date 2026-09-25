@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Clock3, ShieldCheck, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Cabecalho } from "@/components/Cabecalho";
@@ -22,6 +22,7 @@ export const Route = createFileRoute("/admin")({
 
 function Admin() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, carregando, isAdmin } = useAuth();
   useEffect(() => { if (!carregando && (!user || !isAdmin)) void navigate({ to: user ? "/organizacao" : "/entrar" }); }, [carregando, user, isAdmin, navigate]);
   const { data: perfis, refetch } = useQuery({
@@ -32,10 +33,10 @@ function Admin() {
     if (!user) return;
     const { error } = await supabase.from("profiles").update({ approval_status: status, reviewed_at: new Date().toISOString(), reviewed_by: user.id }).eq("id", id);
     if (error) return void toast.error("Não foi possível atualizar este cadastro.");
-    await refetch(); toast.success(status === "approved" ? "Cadastro aprovado." : "Cadastro recusado.");
+    await refetch(); await queryClient.invalidateQueries({ queryKey: ["pendentes-aprovacao"] }); toast.success(status === "approved" ? "Cadastro aprovado." : "Cadastro recusado.");
   }
   return <div className="min-h-screen surface-wave"><Cabecalho /><main className="mx-auto max-w-4xl space-y-6 px-4 py-8">
-    <header><p className="flex items-center gap-2 font-bold text-primary"><ShieldCheck className="size-5" />Administração</p><h1 className="text-3xl font-bold">Aprovar cadastros</h1><p className="mt-2 text-muted-foreground">Revise quem poderá usar as áreas privadas da ferramenta.</p></header>
+     <header><p className="flex items-center gap-2 font-bold text-primary"><ShieldCheck className="size-5" />Administração</p><h1 className="text-3xl font-bold">Aprovar cadastros</h1><p className="mt-2 text-muted-foreground">{perfis?.filter((perfil) => perfil.approval_status === "pending").length ?? 0} cadastro(s) aguardando aprovação.</p></header>
     <div className="space-y-3">{perfis?.map((perfil) => { const pendente = perfil.approval_status === "pending"; return <Card key={perfil.id}><CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">{perfil.nome || "Nome não informado"}</h2><Badge variant={pendente ? "secondary" : perfil.approval_status === "approved" ? "default" : "destructive"}>{pendente ? "Aguardando" : perfil.approval_status === "approved" ? "Aprovado" : "Recusado"}</Badge></div><p className="text-sm text-muted-foreground">{perfil.email || "E-mail não informado"}</p></div><div className="flex gap-2"><Button variant="outline" disabled={perfil.approval_status === "rejected"} onClick={() => void revisar(perfil.id, "rejected")}><XCircle className="mr-2 size-4" />Recusar</Button><Button disabled={perfil.approval_status === "approved"} onClick={() => void revisar(perfil.id, "approved")}><CheckCircle2 className="mr-2 size-4" />Aprovar</Button></div></CardContent></Card>; })}</div>
     {perfis?.length === 0 && <p className="rounded-lg border-2 border-dashed p-10 text-center text-muted-foreground"><Clock3 className="mx-auto mb-2 size-8" />Nenhum cadastro recebido.</p>}
   </main></div>;
