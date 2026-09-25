@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, CheckCircle2, Loader2, Plus, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Cabecalho } from "@/components/Cabecalho";
