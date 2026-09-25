@@ -95,7 +95,8 @@ function NovoProjeto() {
   useEffect(() => {
     if (!user || !organizacao) return;
     let ativo = true;
-    const chave = `voz-do-mar:novo:${user.id}:${organizacao.id}`;
+    const organizacaoAtual = organizacao;
+    const chave = `voz-do-mar:novo:${user.id}:${organizacaoAtual.id}`;
 
     async function carregarRascunho() {
       const salvo = window.localStorage.getItem(chave);
@@ -105,20 +106,16 @@ function NovoProjeto() {
             etapa?: number; indice?: number; editalId?: string; respostas?: string[];
             checklist?: unknown; resumoAnalise?: string; analiseId?: string;
           };
-          if (dados.editalId) setEditalId(dados.editalId);
-          if (dados.respostas?.length === PERGUNTAS.length) setRespostas(dados.respostas);
-          if (checklistValido(dados.checklist) && dados.checklist.length > 0) {
-            setChecklist(dados.checklist);
-            setEtapa(typeof dados.etapa === "number" ? Math.max(1, Math.min(3, dados.etapa)) : 1);
-          }
-          if (typeof dados.indice === "number") setIndice(Math.max(0, Math.min(PERGUNTAS.length - 1, dados.indice)));
-          if (dados.resumoAnalise) setResumoAnalise(dados.resumoAnalise);
-          if (dados.analiseId) setAnaliseId(dados.analiseId);
           const { data: analiseSalva } = dados.analiseId
-            ? await supabase.from("analises_editais").select("id").eq("id", dados.analiseId).eq("organizacao_id", organizacao.id).eq("edital_id", dados.editalId ?? "").maybeSingle()
+             ? await supabase.from("analises_editais").select("id").eq("id", dados.analiseId).eq("organizacao_id", organizacaoAtual.id).eq("edital_id", dados.editalId ?? "").maybeSingle()
             : { data: null };
-          if (analiseSalva && dados.editalId && checklistValido(dados.checklist) && dados.checklist.length > 0) {
-            if (ativo) setRascunhoCarregado(true);
+           if (ativo && analiseSalva && dados.editalId && checklistValido(dados.checklist) && dados.checklist.length > 0) {
+             setEditalId(dados.editalId); setChecklist(dados.checklist); setAnaliseId(analiseSalva.id);
+             setRespostas(dados.respostas?.length === PERGUNTAS.length ? dados.respostas : PERGUNTAS.map(() => ""));
+             setIndice(typeof dados.indice === "number" ? Math.max(0, Math.min(PERGUNTAS.length - 1, dados.indice)) : 0);
+             setResumoAnalise(dados.resumoAnalise ?? "");
+             setEtapa(typeof dados.etapa === "number" ? Math.max(1, Math.min(3, dados.etapa)) : 1);
+             setRascunhoCarregado(true);
             return;
           }
         } catch {
@@ -129,7 +126,7 @@ function NovoProjeto() {
       const { data } = await supabase
         .from("analises_editais")
         .select("id, edital_id, checklist, resumo")
-        .eq("organizacao_id", organizacao.id)
+        .eq("organizacao_id", organizacaoAtual.id)
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();

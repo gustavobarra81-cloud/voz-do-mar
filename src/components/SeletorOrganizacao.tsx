@@ -11,7 +11,7 @@ export function SeletorOrganizacao({ onChange, mostrarNova = true }: Props) {
   return <div className="space-y-2">
     <Label htmlFor="organizacao-ativa">Organização</Label>
     <div className="flex flex-wrap gap-2">
-      <Select value={organizacao?.id} onValueChange={(id) => { escolher(id); onChange?.(id); }}>
+      <Select value={organizacao?.id ?? ""} onValueChange={(id) => { escolher(id); onChange?.(id); }}>
         <SelectTrigger id="organizacao-ativa" className="min-h-12 min-w-0 flex-1 text-base"><SelectValue placeholder="Escolha a organização" /></SelectTrigger>
         <SelectContent>{organizacoes.map((item) => <SelectItem key={item.id} value={item.id}>{item.nome_fantasia || item.razao_social || "Organização sem nome"}</SelectItem>)}</SelectContent>
       </Select>

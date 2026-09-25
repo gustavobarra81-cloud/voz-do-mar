@@ -17,7 +17,7 @@ import { useOrganizacoes } from "@/lib/useOrganizacoes";
 import { SeletorOrganizacao } from "@/components/SeletorOrganizacao";
 
 export const Route = createFileRoute("/organizacao")({
-  validateSearch: (search: Record<string, unknown>) => ({ nova: search.nova === true }),
+  validateSearch: (search: Record<string, unknown>) => ({ nova: search["nova"] === true }),
   head: () => ({ meta: [
     { title: "Minha organização — Voz do Mar" },
     { name: "description", content: "Cadastre os dados da organização que vai concorrer aos editais." },
