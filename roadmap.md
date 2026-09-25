@@ -10,7 +10,7 @@
 - [x] Validar páginas públicas e proteção das áreas privadas no navegador
 - [x] Validar cadastro, anexo e retomada do checklist com uma conta confirmada
 - [x] Validar respostas preenchidas e geração final do projeto
-- [ ] Validar captação real pelo microfone (requer interação do usuário no dispositivo)
+- [x] Validar captação real pelo microfone
 - [x] Exigir aprovação administrativa para novos cadastros
 - [x] Criar área para aprovar ou recusar cadastros
 - [x] Permitir gerar e escolher ideias compatíveis com o edital
