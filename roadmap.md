@@ -17,3 +17,5 @@
 - [x] Validar geração das sugestões no navegador
 - [x] Mostrar contador de cadastros pendentes ao administrador
 - [x] Permitir várias organizações por conta com documentos, editais e projetos separados
+
+- [x] Radar de Editais: busca nas fontes, filtros combináveis, compartilhar no WhatsApp, analisar com a organização

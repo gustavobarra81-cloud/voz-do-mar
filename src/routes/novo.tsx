@@ -36,6 +36,8 @@ export const Route = createFileRoute("/novo")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>): { edital?: string } =>
+    typeof search["edital"] === "string" ? { edital: search["edital"] } : {},
   component: NovoProjeto,
 });
 
@@ -147,6 +149,14 @@ function NovoProjeto() {
     void carregarRascunho();
     return () => { ativo = false; };
   }, [user?.id, organizacao?.id, organizacoes.length]);
+
+  const { edital: editalDoRadar } = Route.useSearch();
+  useEffect(() => {
+    if (!editalDoRadar || !rascunhoCarregado) return;
+    setEtapa(0); setEditalId(editalDoRadar); setAnaliseId(null); setChecklist([]); setResumoAnalise("");
+    setRespostas(PERGUNTAS.map(() => "")); setIndice(0); setIdeias([]);
+    void navigate({ to: "/novo", search: {}, replace: true });
+  }, [editalDoRadar, rascunhoCarregado]);
 
   function trocarOrganizacao() {
     setRascunhoCarregado(false); setEtapa(0); setEditalId(null); setAnaliseId(null);

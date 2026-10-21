@@ -401,6 +401,54 @@ export type Database = {
           },
         ]
       }
+      radar_editais: {
+        Row: {
+          abrangencia: string
+          created_at: string
+          fonte: string | null
+          id: string
+          link: string
+          orgao: string | null
+          prazo: string | null
+          publico_elegivel: string | null
+          resumo: string | null
+          temas: string[]
+          titulo: string
+          updated_at: string
+          valor: string | null
+        }
+        Insert: {
+          abrangencia?: string
+          created_at?: string
+          fonte?: string | null
+          id?: string
+          link: string
+          orgao?: string | null
+          prazo?: string | null
+          publico_elegivel?: string | null
+          resumo?: string | null
+          temas?: string[]
+          titulo: string
+          updated_at?: string
+          valor?: string | null
+        }
+        Update: {
+          abrangencia?: string
+          created_at?: string
+          fonte?: string | null
+          id?: string
+          link?: string
+          orgao?: string | null
+          prazo?: string | null
+          publico_elegivel?: string | null
+          resumo?: string | null
+          temas?: string[]
+          titulo?: string
+          updated_at?: string
+          valor?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
