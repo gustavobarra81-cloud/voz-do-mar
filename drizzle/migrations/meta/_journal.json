@@ -36,6 +36,13 @@
       "when": 1790378671899,
       "tag": "0004_allow_multiple_organizations_per_account",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792623797483,
+      "tag": "0005_create_radar_editais",
+      "breakpoints": true
     }
   ]
 }
