@@ -26,7 +26,7 @@ export type FiltrosRadar = { abrangencias: string[]; temas: string[]; busca: str
 /** Dias até o prazo (0 = hoje). null quando o edital não informa prazo. */
 export function diasRestantes(prazo: string | null, hoje = new Date()): number | null {
   if (!prazo) return null;
-  const [a, m, d] = prazo.split("-").map(Number);
+  const [a = 0, m = 1, d = 1] = prazo.split("-").map(Number);
   const fim = Date.UTC(a, m - 1, d);
   const inicio = Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
   return Math.round((fim - inicio) / 86_400_000);
