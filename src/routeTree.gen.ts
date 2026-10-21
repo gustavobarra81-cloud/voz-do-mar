@@ -17,6 +17,7 @@ import { Route as EditaisRouteImport } from './routes/editais'
 import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as NovoRouteImport } from './routes/novo'
 import { Route as OrganizacaoRouteImport } from './routes/organizacao'
+import { Route as RadarRouteImport } from './routes/radar'
 import { Route as ProjetosIndexRouteImport } from './routes/projetos.index'
 import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
 
@@ -60,6 +61,11 @@ const OrganizacaoRoute = OrganizacaoRouteImport.update({
   path: '/organizacao',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RadarRoute = RadarRouteImport.update({
+  id: '/radar',
+  path: '/radar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjetosIndexRoute = ProjetosIndexRouteImport.update({
   id: '/projetos/',
   path: '/projetos/',
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/entrar': typeof EntrarRoute
   '/novo': typeof NovoRoute
   '/organizacao': typeof OrganizacaoRoute
+  '/radar': typeof RadarRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/': typeof ProjetosIndexRoute
 }
@@ -92,6 +99,7 @@ export interface FileRoutesByTo {
   '/entrar': typeof EntrarRoute
   '/novo': typeof NovoRoute
   '/organizacao': typeof OrganizacaoRoute
+  '/radar': typeof RadarRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos': typeof ProjetosIndexRoute
 }
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/entrar': typeof EntrarRoute
   '/novo': typeof NovoRoute
   '/organizacao': typeof OrganizacaoRoute
+  '/radar': typeof RadarRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/': typeof ProjetosIndexRoute
 }
@@ -119,6 +128,7 @@ export interface FileRouteTypes {
     | '/entrar'
     | '/novo'
     | '/organizacao'
+    | '/radar'
     | '/projetos/$id'
     | '/projetos/'
   fileRoutesByTo: FileRoutesByTo
@@ -131,6 +141,7 @@ export interface FileRouteTypes {
     | '/entrar'
     | '/novo'
     | '/organizacao'
+    | '/radar'
     | '/projetos/$id'
     | '/projetos'
   id:
@@ -143,6 +154,7 @@ export interface FileRouteTypes {
     | '/entrar'
     | '/novo'
     | '/organizacao'
+    | '/radar'
     | '/projetos/$id'
     | '/projetos/'
   fileRoutesById: FileRoutesById
@@ -156,6 +168,7 @@ export interface RootRouteChildren {
   EntrarRoute: typeof EntrarRoute
   NovoRoute: typeof NovoRoute
   OrganizacaoRoute: typeof OrganizacaoRoute
+  RadarRoute: typeof RadarRoute
   ProjetosIdRoute: typeof ProjetosIdRoute
   ProjetosIndexRoute: typeof ProjetosIndexRoute
 }
@@ -218,6 +231,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrganizacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/radar': {
+      id: '/radar'
+      path: '/radar'
+      fullPath: '/radar'
+      preLoaderRoute: typeof RadarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projetos/': {
       id: '/projetos/'
       path: '/projetos'
@@ -244,6 +264,7 @@ const rootRouteChildren: RootRouteChildren = {
   EntrarRoute: EntrarRoute,
   NovoRoute: NovoRoute,
   OrganizacaoRoute: OrganizacaoRoute,
+  RadarRoute: RadarRoute,
   ProjetosIdRoute: ProjetosIdRoute,
   ProjetosIndexRoute: ProjetosIndexRoute,
 }
