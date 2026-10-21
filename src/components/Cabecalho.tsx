@@ -1,7 +1,7 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Anchor, Building2, FileCheck2, FileText, FolderOpen, LogOut, ShieldCheck } from "lucide-react";
+import { Anchor, Building2, FileCheck2, FileText, FolderOpen, LogOut, Radar, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/useAuth";
@@ -32,6 +32,10 @@ export function Cabecalho() {
         <nav className="flex items-center gap-1">
           {user && aprovado ? (
             <>
+              <Button asChild variant="ghost" className="text-base">
+                <Link to="/radar" aria-label="Radar de Editais"><Radar className="size-5 lg:mr-2" /><span className="hidden lg:inline">Radar</span></Link>
+              </Button>
+
               <Button asChild variant="ghost" className="hidden text-base md:inline-flex">
                 <Link to="/organizacao" search={{ nova: false }}><Building2 className="mr-2 size-4" /> Organização</Link>
               </Button>
