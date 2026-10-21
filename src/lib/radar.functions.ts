@@ -42,8 +42,15 @@ export const atualizarRadar = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { data: admin } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
     if (!admin) throw new Error("Somente administradores podem atualizar o radar.");
+    return executarVarreduraRadar(context.supabase);
+  });
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function executarVarreduraRadar(supabase: any) {
+    const context = { supabase };
     const apiKey = process.env["LOVABLE_API_KEY"];
     if (!apiKey) throw new Error("A inteligência artificial não está configurada.");
+
 
     const paginas = (await Promise.all(FONTES.map(baixar))).filter((p) => p !== null);
     if (paginas.length === 0) throw new Error("Não conseguimos acessar os sites de editais agora. Tente mais tarde.");
@@ -87,4 +94,4 @@ export const atualizarRadar = createServerFn({ method: "POST" })
       if (error) { console.error(error); throw new Error("Não conseguimos salvar os editais encontrados."); }
     }
     return { encontrados: verificados.length, fontes: paginas.map((p) => p.nome) };
-  });
+}

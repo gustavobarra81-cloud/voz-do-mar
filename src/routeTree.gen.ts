@@ -20,6 +20,7 @@ import { Route as OrganizacaoRouteImport } from './routes/organizacao'
 import { Route as RadarRouteImport } from './routes/radar'
 import { Route as ProjetosIndexRouteImport } from './routes/projetos.index'
 import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
+import { Route as ApiPublicJobsRadarSemanalRouteImport } from './routes/api/public/jobs/radar-semanal'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -76,6 +77,12 @@ const ProjetosIdRoute = ProjetosIdRouteImport.update({
   path: '/projetos/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicJobsRadarSemanalRoute =
+  ApiPublicJobsRadarSemanalRouteImport.update({
+    id: '/api/public/jobs/radar-semanal',
+    path: '/api/public/jobs/radar-semanal',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/radar': typeof RadarRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/': typeof ProjetosIndexRoute
+  '/api/public/jobs/radar-semanal': typeof ApiPublicJobsRadarSemanalRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -102,6 +110,7 @@ export interface FileRoutesByTo {
   '/radar': typeof RadarRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos': typeof ProjetosIndexRoute
+  '/api/public/jobs/radar-semanal': typeof ApiPublicJobsRadarSemanalRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -116,6 +125,7 @@ export interface FileRoutesById {
   '/radar': typeof RadarRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/': typeof ProjetosIndexRoute
+  '/api/public/jobs/radar-semanal': typeof ApiPublicJobsRadarSemanalRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,6 +141,7 @@ export interface FileRouteTypes {
     | '/radar'
     | '/projetos/$id'
     | '/projetos/'
+    | '/api/public/jobs/radar-semanal'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,6 +155,7 @@ export interface FileRouteTypes {
     | '/radar'
     | '/projetos/$id'
     | '/projetos'
+    | '/api/public/jobs/radar-semanal'
   id:
     | '__root__'
     | '/'
@@ -157,6 +169,7 @@ export interface FileRouteTypes {
     | '/radar'
     | '/projetos/$id'
     | '/projetos/'
+    | '/api/public/jobs/radar-semanal'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -171,6 +184,7 @@ export interface RootRouteChildren {
   RadarRoute: typeof RadarRoute
   ProjetosIdRoute: typeof ProjetosIdRoute
   ProjetosIndexRoute: typeof ProjetosIndexRoute
+  ApiPublicJobsRadarSemanalRoute: typeof ApiPublicJobsRadarSemanalRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -252,6 +266,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjetosIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/jobs/radar-semanal': {
+      id: '/api/public/jobs/radar-semanal'
+      path: '/api/public/jobs/radar-semanal'
+      fullPath: '/api/public/jobs/radar-semanal'
+      preLoaderRoute: typeof ApiPublicJobsRadarSemanalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -267,6 +288,7 @@ const rootRouteChildren: RootRouteChildren = {
   RadarRoute: RadarRoute,
   ProjetosIdRoute: ProjetosIdRoute,
   ProjetosIndexRoute: ProjetosIndexRoute,
+  ApiPublicJobsRadarSemanalRoute: ApiPublicJobsRadarSemanalRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
