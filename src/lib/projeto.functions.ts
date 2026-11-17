@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database, Json } from "@/integrations/supabase/types";
-import { instrucoesEstrutura, LIMITE_TEXTO, normalizarEstrutura } from "@/lib/edital";
+import { instrucoesEstrutura, juntarHtml, LIMITE_TEXTO, montarSecoes, normalizarEstrutura, normalizarSecoesProjeto, SECAO_CRITERIOS } from "@/lib/edital";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1";
 
@@ -252,81 +252,121 @@ export const sugerirIdeias = createServerFn({ method: "POST" })
   });
 
 /* ------------------------------------------------------------------ */
-/* Escrever o projeto                                                   */
+/* Escrever o projeto, uma parte por vez                                */
 /* ------------------------------------------------------------------ */
 
-const ProjetoInput = z.object({
-  editalId: z.string().uuid(),
-  organizacaoId: z.string().uuid(),
-  checklist: z.array(z.object({ requisito: z.string(), situacao: z.string(), evidencia: z.string(), orientacao: z.string() })),
-  respostas: z.array(z.object({ pergunta: z.string(), resposta: z.string() })).min(1),
-});
+async function carregarProjeto(supabase: SupabaseClient<Database>, projetoId: string) {
+  const { data: projeto } = await supabase
+    .from("projetos")
+    .select("id, titulo, edital_id, organizacao_id, analise_id, respostas, secoes")
+    .eq("id", projetoId).maybeSingle();
+  if (!projeto) throw new Error("Não encontramos esse projeto.");
+  if (!projeto.edital_id || !projeto.organizacao_id) throw new Error("Este projeto não está ligado a um edital e organização.");
+  const { data: edital } = await supabase
+    .from("editais")
+    .select("titulo, orgao, resumo, exigencias, valor_maximo, prazo, texto_completo, criterios")
+    .eq("id", projeto.edital_id).maybeSingle();
+  if (!edital) throw new Error("Não encontramos o edital deste projeto.");
+  return { projeto, edital };
+}
 
-export const escreverProjeto = createServerFn({ method: "POST" })
+export const planejarProjeto = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => ProjetoInput.parse(input))
+  .inputValidator((input: unknown) => z.object({ projetoId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await exigirAprovacao(context);
-    const { data: edital } = await context.supabase
-      .from("editais")
-      .select("titulo, orgao, resumo, exigencias, valor_maximo, prazo, texto_completo, criterios")
-      .eq("id", data.editalId)
-      .maybeSingle();
-    if (!edital) throw new Error("Não encontramos esse edital. Escolha o edital de novo.");
-    const { data: org } = await context.supabase
-      .from("organizacoes")
-      .select("*")
-      .eq("id", data.organizacaoId)
-      .maybeSingle();
-    if (!org) throw new Error("Não encontramos a organização selecionada.");
+    const { projeto, edital } = await carregarProjeto(context.supabase, data.projetoId);
+    if (normalizarSecoesProjeto(projeto.secoes).length > 0) return { total: normalizarSecoesProjeto(projeto.secoes).length };
+    const secoes = montarSecoes(normalizarEstrutura(edital.criterios));
+    const { error } = await context.supabase.from("projetos")
+      .update({ secoes: secoes as unknown as Json, status: "rascunho", updated_at: new Date().toISOString() })
+      .eq("id", data.projetoId);
+    if (error) throw new Error("Não conseguimos preparar o projeto.");
+    return { total: secoes.length };
+  });
+
+const SecaoInput = z.object({
+  projetoId: z.string().uuid(),
+  indice: z.number().int().min(0),
+  instrucao: z.string().max(4000).optional(),
+});
+
+export const escreverSecao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => SecaoInput.parse(input))
+  .handler(async ({ data, context }) => {
+    await exigirAprovacao(context);
+    const { projeto, edital } = await carregarProjeto(context.supabase, data.projetoId);
+    const secoes = normalizarSecoesProjeto(projeto.secoes);
+    const secao = secoes[data.indice];
+    if (!secao) throw new Error("Essa parte do projeto não existe.");
+
+    const { data: org } = await context.supabase.from("organizacoes").select("*").eq("id", projeto.organizacao_id!).maybeSingle();
+    if (!org) throw new Error("Não encontramos a organização do projeto.");
     const { id: _id, owner_id: _o, created_at: _c, updated_at: _u, ...organizacao } = org;
+    const { data: analise } = projeto.analise_id
+      ? await context.supabase.from("analises_editais").select("checklist").eq("id", projeto.analise_id).maybeSingle()
+      : { data: null };
 
     const estrutura = normalizarEstrutura(edital.criterios);
+    const respostas = Array.isArray(projeto.respostas) ? (projeto.respostas as { pergunta?: string; resposta?: string }[]) : [];
+    const falas = respostas.filter((r) => r?.resposta?.trim()).map((r) => `Pergunta: ${r.pergunta}\nResposta da comunidade: ${r.resposta}`).join("\n\n");
+    const outras = secoes.map((s, i) => (i !== data.indice && s.html ? `<h3>${s.nome}</h3>\n${s.html}` : "")).filter(Boolean).join("\n").slice(0, 60_000);
+    const primeira = data.indice === 0 && !data.instrucao;
+    const ehCriterios = secao.nome === SECAO_CRITERIOS;
+
     const lovable = criarModelo(pegarChave());
-
-    const falas = data.respostas
-      .filter((r) => r.resposta.trim().length > 0)
-      .map((r) => `Pergunta: ${r.pergunta}\nResposta da comunidade: ${r.resposta}`)
-      .join("\n\n");
-
     const resultado = streamText({
       model: lovable.responses("openai/gpt-6-astra"),
       providerOptions: opcoesRaciocinio,
       system: [
         "Você é um redator experiente de projetos sociais e socioambientais no Brasil, especialista em editais públicos e em pesca artesanal.",
-        "Escreva projetos completos, formais e prontos para submissão, sempre em português do Brasil.",
-        "Siga exatamente a estrutura de seções exigida pelo edital e responda de forma explícita a cada critério de pontuação, para maximizar a nota.",
-        "Use SOMENTE as informações cadastradas da organização, comprovadas no checklist ou contadas pela comunidade. Onde faltar dado (valores, datas, número de pessoas), escreva um marcador entre colchetes, por exemplo [COMPLETAR: número de famílias].",
-        "Nunca invente nomes, CNPJ, telefones, endereços, experiências ou valores.",
-        "Responda em HTML simples usando apenas as tags h2, h3, p, ul, li, ol, table, tr, th, td e strong. Não use markdown nem ```.",
-      ].join(" "),
+        "Escreva em português do Brasil, formal e pronto para submissão. Você escreve UMA parte do projeto por vez.",
+        "Responda de forma explícita aos critérios de pontuação relacionados a esta parte.",
+        "Use SOMENTE as informações cadastradas da organização, comprovadas no checklist ou contadas pela comunidade. Onde faltar dado, escreva [COMPLETAR: ...].",
+        "Nunca invente nomes, CNPJ, telefones, endereços, experiências ou valores. Não repita o que outras partes já dizem.",
+        "Responda em HTML simples usando apenas p, ul, li, ol, table, tr, th, td e strong. NÃO inclua o título da parte. Não use markdown nem ```.",
+        primeira ? "Na PRIMEIRA linha escreva TITULO: <um título forte para o projeto>, depois o HTML da parte." : "",
+      ].filter(Boolean).join(" "),
       prompt: [
         `EDITAL: ${edital.titulo}`,
         edital.orgao ? `ÓRGÃO: ${edital.orgao}` : "",
         edital.resumo ? `SOBRE O EDITAL: ${edital.resumo}` : "",
         edital.valor_maximo ? `VALOR: ${edital.valor_maximo}` : "",
-        edital.exigencias ? `EXIGÊNCIAS DO EDITAL: ${edital.exigencias}` : "",
+        edital.exigencias ? `EXIGÊNCIAS: ${edital.exigencias}` : "",
         edital.texto_completo ? `TEXTO COMPLETO DO EDITAL:\n"""\n${edital.texto_completo.slice(0, LIMITE_TEXTO)}\n"""` : "",
+        "", instrucoesEstrutura(estrutura), "",
+        `ORGANIZAÇÃO: ${JSON.stringify(organizacao)}`,
+        `CHECKLIST: ${JSON.stringify(analise?.checklist ?? [])}`,
+        "", "O QUE A COMUNIDADE CONTOU:", falas || "(nada)", "",
+        outras ? `PARTES JÁ ESCRITAS (para manter coerência):\n${outras}` : "",
         "",
-        instrucoesEstrutura(estrutura),
-        "",
-        `DADOS CADASTRADOS DA ORGANIZAÇÃO: ${JSON.stringify(organizacao)}`,
-        `CHECKLIST DA ANÁLISE: ${JSON.stringify(data.checklist)}`,
-        "",
-        "O QUE A COMUNIDADE CONTOU (transcrição da fala):",
-        falas,
-        "",
-        "Comece com um <h2> com um título forte para o projeto. Cada seção deve ter conteúdo consistente, dentro do limite indicado.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
+        `ESCREVA AGORA SOMENTE A PARTE: "${secao.nome}" (parte ${data.indice + 1} de ${secoes.length}).`,
+        secao.conteudo ? `Deve conter: ${secao.conteudo}` : "",
+        secao.limite ? `LIMITE OBRIGATÓRIO: ${secao.limite}.` : "Escreva pelo menos dois parágrafos consistentes.",
+        ehCriterios ? "Faça a tabela com uma linha para cada critério, indicando a pontuação e em qual parte do projeto ele é respondido." : "",
+        data.instrucao ? `TEXTO ATUAL DESTA PARTE:\n${secao.html}\n\nPEDIDO DE MUDANÇA DA PESSOA: ${data.instrucao}\nReescreva a parte atendendo ao pedido, sem inventar dados.` : "",
+      ].filter(Boolean).join("\n"),
     });
 
-    const html = (await resultado.text).replace(/```html|```/g, "").trim();
-    if (!html) throw new Error("A escrita do projeto não retornou conteúdo. Tente de novo.");
+    let texto = (await resultado.text).replace(/```html|```/g, "").trim();
+    let titulo = projeto.titulo;
+    if (primeira) {
+      const m = texto.match(/^\s*TITULO:\s*(.+)\s*\n/i);
+      if (m) { titulo = m[1]!.replace(/<[^>]+>/g, "").trim().slice(0, 120); texto = texto.slice(m[0].length).trim(); }
+    }
+    texto = texto.replace(/^<h[23][^>]*>.*?<\/h[23]>\s*/i, "");
+    if (!texto) throw new Error("Essa parte veio vazia. Tente de novo.");
 
-    const tituloMatch = html.match(/<h2[^>]*>(.*?)<\/h2>/i);
-    const titulo = (tituloMatch?.[1] ?? "Projeto").replace(/<[^>]+>/g, "").trim();
-
-    return { html, titulo: titulo.slice(0, 120) };
+    secoes[data.indice] = { ...secao, html: texto };
+    const pronto = secoes.every((s) => s.html.trim());
+    const { error } = await context.supabase.from("projetos").update({
+      secoes: secoes as unknown as Json,
+      titulo,
+      conteudo: juntarHtml(titulo, secoes),
+      status: pronto ? "pronto" : "rascunho",
+      updated_at: new Date().toISOString(),
+    }).eq("id", data.projetoId);
+    if (error) throw new Error("Não conseguimos salvar essa parte.");
+    return { ok: true, pronto };
   });

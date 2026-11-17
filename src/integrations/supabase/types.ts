@@ -343,6 +343,7 @@ export type Database = {
           id: string
           organizacao_id: string | null
           respostas: Json
+          secoes: Json
           status: string
           titulo: string
           transcricao: string | null
@@ -357,6 +358,7 @@ export type Database = {
           id?: string
           organizacao_id?: string | null
           respostas?: Json
+          secoes?: Json
           status?: string
           titulo?: string
           transcricao?: string | null
@@ -371,6 +373,7 @@ export type Database = {
           id?: string
           organizacao_id?: string | null
           respostas?: Json
+          secoes?: Json
           status?: string
           titulo?: string
           transcricao?: string | null

@@ -1,8 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Printer, Save } from "lucide-react";
+import { ArrowLeft, Download, Loader2, PenLine, Printer, RotateCcw, Save } from "lucide-react";
+import { BotaoGravar } from "@/components/BotaoGravar";
+import { Progress } from "@/components/ui/progress";
+import { escreverSecao, transcreverAudio } from "@/lib/projeto.functions";
+import { normalizarSecoesProjeto, proximaSecaoVazia, type SecaoProjeto } from "@/lib/edital";
 import { Cabecalho } from "@/components/Cabecalho";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,7 +52,7 @@ function VerProjeto() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projetos")
-        .select("id, titulo, conteudo, created_at")
+        .select("id, titulo, conteudo, created_at, status, secoes")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -58,6 +63,42 @@ function VerProjeto() {
   useEffect(() => {
     if (projeto?.conteudo) setRascunho(projeto.conteudo);
   }, [projeto?.conteudo]);
+
+  const escrever = useServerFn(escreverSecao);
+  const secoes = normalizarSecoesProjeto(projeto?.secoes);
+  const proxima = proximaSecaoVazia(secoes);
+  const [escrevendo, setEscrevendo] = useState<number | null>(null);
+  const [falhou, setFalhou] = useState(false);
+  const rodando = useRef(false);
+
+  async function continuarEscrita() {
+    if (rodando.current) return;
+    rodando.current = true;
+    setFalhou(false);
+    try {
+      for (;;) {
+        const { data: atual } = await refetch();
+        const lista = normalizarSecoesProjeto(atual?.secoes);
+        const i = proximaSecaoVazia(lista);
+        if (i < 0) break;
+        setEscrevendo(i);
+        await escrever({ data: { projetoId: id, indice: i } });
+      }
+      await refetch();
+      toast.success("Projeto completo!");
+    } catch (erro) {
+      setFalhou(true);
+      toast.error(erro instanceof Error ? erro.message : "A escrita parou. Tente de novo.");
+    } finally {
+      setEscrevendo(null);
+      rodando.current = false;
+    }
+  }
+
+  useEffect(() => {
+    if (projeto && proxima >= 0 && !falhou) void continuarEscrita();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projeto?.id, proxima >= 0]);
 
   async function salvar() {
     setSalvando(true);
@@ -115,6 +156,18 @@ function VerProjeto() {
           </Button>
         </div>
 
+        {proxima >= 0 && secoes.length > 0 && (
+          <div className="nao-imprimir space-y-3 rounded-3xl bg-card p-5 shadow-soft">
+            <p className="flex items-center gap-2 font-bold">
+              {falhou ? <RotateCcw className="size-5" /> : <Loader2 className="size-5 animate-spin" />}
+              {falhou ? "A escrita parou em" : "Escrevendo"} {(escrevendo ?? proxima) + 1} de {secoes.length}: {secoes[escrevendo ?? proxima]?.nome}
+            </p>
+            <Progress value={(secoes.filter((s) => s.html).length / secoes.length) * 100} />
+            <p className="text-sm text-muted-foreground">Pode fechar a página: ao voltar, a escrita continua de onde parou.</p>
+            {falhou && <Button onClick={() => void continuarEscrita()}><RotateCcw className="mr-2 size-4" />Tentar de novo</Button>}
+          </div>
+        )}
+
         {editando ? (
           <Textarea
             rows={30}
@@ -123,12 +176,69 @@ function VerProjeto() {
             onChange={(e) => setRascunho(e.target.value)}
           />
         ) : (
-          <article
-            className="texto-projeto rounded-3xl bg-card p-6 shadow-soft md:p-10"
-            dangerouslySetInnerHTML={{ __html: projeto?.conteudo ?? "" }}
-          />
+          secoes.length > 0 ? (
+            <article className="texto-projeto space-y-6 rounded-3xl bg-card p-6 shadow-soft md:p-10">
+              <h2>{projeto?.titulo}</h2>
+              {secoes.map((secao, i) => secao.html ? (
+                <ParteProjeto key={i} secao={secao} indice={i} projetoId={id} bloqueado={escrevendo !== null} aoMudar={() => void refetch()} />
+              ) : null)}
+            </article>
+          ) : (
+            <article
+              className="texto-projeto rounded-3xl bg-card p-6 shadow-soft md:p-10"
+              dangerouslySetInnerHTML={{ __html: projeto?.conteudo ?? "" }}
+            />
+          )
         )}
       </main>
     </div>
+  );
+}
+
+function ParteProjeto({ secao, indice, projetoId, bloqueado, aoMudar }: { secao: SecaoProjeto; indice: number; projetoId: string; bloqueado: boolean; aoMudar: () => void }) {
+  const escrever = useServerFn(escreverSecao);
+  const transcrever = useServerFn(transcreverAudio);
+  const [aberto, setAberto] = useState(false);
+  const [pedido, setPedido] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const [ouvindo, setOuvindo] = useState(false);
+
+  async function reescrever() {
+    if (!pedido.trim()) { toast.error("Conte o que você quer mudar."); return; }
+    setOcupado(true);
+    try {
+      await escrever({ data: { projetoId, indice, instrucao: pedido.trim() } });
+      setPedido(""); setAberto(false); aoMudar();
+      toast.success(`"${secao.nome}" reescrita.`);
+    } catch (erro) {
+      toast.error(erro instanceof Error ? erro.message : "Não conseguimos reescrever. Tente de novo.");
+    } finally { setOcupado(false); }
+  }
+
+  return (
+    <section className="relative">
+      <h3>{secao.nome}</h3>
+      <div className={ocupado ? "opacity-50" : ""} dangerouslySetInnerHTML={{ __html: secao.html }} />
+      <div className="nao-imprimir mt-3">
+        {!aberto ? (
+          <Button variant="outline" size="sm" disabled={bloqueado} onClick={() => setAberto(true)}><PenLine className="mr-2 size-4" />Reescrever esta parte</Button>
+        ) : (
+          <div className="space-y-3 rounded-2xl border border-border bg-muted/40 p-4">
+            <p className="font-bold">O que você quer mudar em "{secao.nome}"?</p>
+            <Textarea rows={3} value={pedido} onChange={(e) => setPedido(e.target.value)} placeholder="Escreva ou fale, por exemplo: deixe mais curto e fale das marisqueiras" />
+            <BotaoGravar ocupado={ouvindo} aoTranscrever={async (base64) => {
+              setOuvindo(true);
+              try { const { texto } = await transcrever({ data: { audioBase64: base64 } }); setPedido((p) => (p ? `${p} ${texto}` : texto)); }
+              catch (erro) { toast.error(erro instanceof Error ? erro.message : "Não conseguimos ouvir."); }
+              finally { setOuvindo(false); }
+            }} />
+            <div className="flex gap-2">
+              <Button disabled={ocupado} onClick={() => void reescrever()}>{ocupado && <Loader2 className="mr-2 size-4 animate-spin" />}Reescrever</Button>
+              <Button variant="ghost" disabled={ocupado} onClick={() => setAberto(false)}>Cancelar</Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

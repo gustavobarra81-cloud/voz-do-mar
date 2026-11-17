@@ -16,7 +16,7 @@ import { useAuth } from "@/lib/useAuth";
 import { useOrganizacoes } from "@/lib/useOrganizacoes";
 import { SeletorOrganizacao } from "@/components/SeletorOrganizacao";
 import { normalizarEstrutura } from "@/lib/edital";
-import { analisarEdital, escreverProjeto, lerEdital, sugerirIdeias, transcreverAudio } from "@/lib/projeto.functions";
+import { analisarEdital, planejarProjeto, lerEdital, sugerirIdeias, transcreverAudio } from "@/lib/projeto.functions";
 
 export const Route = createFileRoute("/novo")({
   head: () => ({
@@ -172,7 +172,7 @@ function NovoProjeto() {
 
   const transcrever = useServerFn(transcreverAudio);
   const importarEdital = useServerFn(lerEdital);
-  const gerar = useServerFn(escreverProjeto);
+  const planejar = useServerFn(planejarProjeto);
   const analisar = useServerFn(analisarEdital);
   const sugerir = useServerFn(sugerirIdeias);
 
@@ -319,18 +319,6 @@ function NovoProjeto() {
     if (!editalEscolhido || !organizacao || !user) return;
     setGerando(true);
     try {
-      const { html, titulo } = await gerar({
-        data: {
-          editalId: editalEscolhido.id,
-          organizacaoId: organizacao.id,
-          checklist,
-          respostas: PERGUNTAS.map((pergunta, i) => ({
-            pergunta,
-            resposta: respostas[i] ?? "",
-          })),
-        },
-      });
-
       const { data, error } = await supabase
         .from("projetos")
         .insert({
@@ -338,15 +326,16 @@ function NovoProjeto() {
           edital_id: editalEscolhido.id,
           organizacao_id: organizacao?.id ?? null,
           analise_id: analiseId,
-          titulo,
-          conteudo: html,
+          titulo: `Projeto — ${editalEscolhido.titulo}`.slice(0, 120),
+          conteudo: "",
           transcricao: respostas.join("\n\n"),
           respostas: PERGUNTAS.map((p, i) => ({ pergunta: p, resposta: respostas[i] ?? "" })),
-          status: "pronto",
+          status: "rascunho",
         })
         .select("id")
         .single();
       if (error) throw error;
+      await planejar({ data: { projetoId: data.id } });
 
       window.localStorage.removeItem(`voz-do-mar:novo:${user.id}:${organizacao.id}`);
       void navigate({ to: "/projetos/$id", params: { id: data.id } });

@@ -43,6 +43,13 @@
       "when": 1792623797483,
       "tag": "0005_create_radar_editais",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794877052975,
+      "tag": "0006_projetos_secoes",
+      "breakpoints": true
     }
   ]
 }

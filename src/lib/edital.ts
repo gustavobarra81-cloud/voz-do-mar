@@ -38,3 +38,30 @@ export function instrucoesEstrutura(e: EstruturaEdital): string {
   }
   return partes.join("\n");
 }
+
+export type SecaoProjeto = { nome: string; conteudo: string; limite: string; html: string };
+export const SECAO_CRITERIOS = "Como o projeto atende aos critérios de avaliação";
+
+export function montarSecoes(e: EstruturaEdital): SecaoProjeto[] {
+  const base = e.secoes.length > 0
+    ? e.secoes.map((s) => ({ nome: s.nome, conteudo: s.conteudo, limite: s.limite, html: "" }))
+    : SECOES_PADRAO.split("; ").map((nome) => ({ nome, conteudo: "", limite: "", html: "" }));
+  if (e.criterios.length > 0) base.push({ nome: SECAO_CRITERIOS, conteudo: "Tabela: Critério | Pontuação | Onde é respondido no projeto, uma linha por critério.", limite: "", html: "" });
+  return base;
+}
+
+export function normalizarSecoesProjeto(valor: unknown): SecaoProjeto[] {
+  if (!Array.isArray(valor)) return [];
+  return valor.filter((s) => s && typeof s === "object").map((s) => {
+    const v = s as Record<string, unknown>;
+    return { nome: txt(v["nome"]), conteudo: txt(v["conteudo"]), limite: txt(v["limite"]), html: typeof v["html"] === "string" ? v["html"] : "" };
+  }).filter((s) => s.nome);
+}
+
+export function juntarHtml(titulo: string, secoes: SecaoProjeto[]): string {
+  return [`<h2>${titulo}</h2>`, ...secoes.filter((s) => s.html).map((s) => `<h3>${s.nome}</h3>\n${s.html}`)].join("\n");
+}
+
+export function proximaSecaoVazia(secoes: SecaoProjeto[]): number {
+  return secoes.findIndex((s) => !s.html.trim());
+}
