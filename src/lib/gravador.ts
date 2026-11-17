@@ -1,4 +1,4 @@
-// Gravação de áudio em WAV (16 kHz mono) — formato aceito em qualquer navegador.
+// Gravação de áudio: comprimido via MediaRecorder (webm/opus, mp4 no Safari); WAV 16 kHz só como último recurso.
 
 function encodeWav(chunks: Float32Array[], sampleRate: number, targetRate = 16000) {
   const total = chunks.reduce((sum, c) => sum + c.length, 0);
@@ -48,8 +48,22 @@ export type Gravacao = {
   nivel: () => number;
 };
 
-export async function iniciarGravacao(): Promise<Gravacao> {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+/** Tempo máximo de cada gravação, em segundos. */
+export const LIMITE_GRAVACAO = 180;
+
+const TIPOS_COMPRIMIDOS = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+
+/** Primeiro formato comprimido que o navegador grava, ou null (usa WAV). */
+export function escolherTipo(suporta: (t: string) => boolean): string | null {
+  return TIPOS_COMPRIMIDOS.find((t) => suporta(t)) ?? null;
+}
+
+/** Tipo sem parâmetros de codec, como o servidor espera. */
+export function tipoBase(tipo: string) {
+  return (tipo.split(";")[0] ?? "").trim().toLowerCase();
+}
+
+function medidor(stream: MediaStream) {
   const AudioCtor =
     window.AudioContext ??
     (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -57,41 +71,68 @@ export async function iniciarGravacao(): Promise<Gravacao> {
   const source = ctx.createMediaStreamSource(stream);
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 512;
-  const processor = ctx.createScriptProcessor(4096, 1, 1);
-  const chunks: Float32Array[] = [];
-
-  processor.onaudioprocess = (event) => {
-    chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
-  };
-
   source.connect(analyser);
-  source.connect(processor);
-  processor.connect(ctx.destination);
-
   const dados = new Uint8Array(analyser.frequencyBinCount);
-
-  const encerrar = () => {
-    stream.getTracks().forEach((t) => t.stop());
-    processor.disconnect();
-    analyser.disconnect();
-    source.disconnect();
-  };
-
   return {
+    ctx, source, analyser,
     nivel: () => {
       analyser.getByteFrequencyData(dados);
       let soma = 0;
       for (const v of dados) soma += v;
       return Math.min(1, soma / dados.length / 90);
     },
-    cancelar: () => {
-      encerrar();
-      void ctx.close();
-    },
+  };
+}
+
+export async function iniciarGravacao(): Promise<Gravacao> {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const tipo = typeof MediaRecorder !== "undefined" ? escolherTipo((t) => MediaRecorder.isTypeSupported(t)) : null;
+  return tipo ? gravarComprimido(stream, tipo) : gravarWav(stream);
+}
+
+function gravarComprimido(stream: MediaStream, tipo: string): Gravacao {
+  const m = medidor(stream);
+  const recorder = new MediaRecorder(stream, { mimeType: tipo, audioBitsPerSecond: 32000 });
+  const partes: Blob[] = [];
+  recorder.ondataavailable = (e) => { if (e.data.size > 0) partes.push(e.data); };
+  recorder.start(1000);
+  const encerrar = () => {
+    stream.getTracks().forEach((t) => t.stop());
+    m.source.disconnect();
+    void m.ctx.close();
+  };
+  return {
+    nivel: m.nivel,
+    cancelar: () => { if (recorder.state !== "inactive") recorder.stop(); encerrar(); },
+    parar: () => new Promise<Blob>((resolve) => {
+      recorder.onstop = () => { encerrar(); resolve(new Blob(partes, { type: tipoBase(recorder.mimeType || tipo) })); };
+      recorder.stop();
+    }),
+  };
+}
+
+function gravarWav(stream: MediaStream): Gravacao {
+  const m = medidor(stream);
+  const processor = m.ctx.createScriptProcessor(4096, 1, 1);
+  const chunks: Float32Array[] = [];
+  processor.onaudioprocess = (event) => {
+    chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+  };
+  m.source.connect(processor);
+  processor.connect(m.ctx.destination);
+  const encerrar = () => {
+    stream.getTracks().forEach((t) => t.stop());
+    processor.disconnect();
+    m.analyser.disconnect();
+    m.source.disconnect();
+  };
+  return {
+    nivel: m.nivel,
+    cancelar: () => { encerrar(); void m.ctx.close(); },
     parar: async () => {
-      const taxa = ctx.sampleRate;
+      const taxa = m.ctx.sampleRate;
       encerrar();
-      await ctx.close();
+      await m.ctx.close();
       return encodeWav(chunks, taxa);
     },
   };

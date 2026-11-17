@@ -235,10 +235,9 @@ function ParteProjeto({ secao, indice, projetoId, bloqueado, aoMudar, real }: { 
           <div className="space-y-3 rounded-2xl border border-border bg-muted/40 p-4">
             <p className="font-bold">O que você quer mudar em "{secao.nome}"?</p>
             <Textarea rows={3} value={pedido} onChange={(e) => setPedido(e.target.value)} placeholder="Escreva ou fale, por exemplo: deixe mais curto e fale das marisqueiras" />
-            <BotaoGravar ocupado={ouvindo} aoTranscrever={async (base64) => {
+            <BotaoGravar ocupado={ouvindo} aoTranscrever={async (audio) => {
               setOuvindo(true);
-              try { const { texto } = await transcrever({ data: { audioBase64: base64 } }); setPedido((p) => (p ? `${p} ${texto}` : texto)); }
-              catch (erro) { toast.error(erro instanceof Error ? erro.message : "Não conseguimos ouvir."); }
+              try { const { texto } = await transcrever({ data: audio }); setPedido((p) => (p ? `${p} ${texto}` : texto)); }
               finally { setOuvindo(false); }
             }} />
             <div className="flex gap-2">

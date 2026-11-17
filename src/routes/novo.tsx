@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, FileUp, HelpCircle, Lightbulb, Loader2, Pencil, Sparkles } from "lucide-react";
 import { Cabecalho } from "@/components/Cabecalho";
-import { BotaoGravar } from "@/components/BotaoGravar";
+import { BotaoGravar, type AudioGravado } from "@/components/BotaoGravar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -265,10 +265,10 @@ function NovoProjeto() {
     finally { setAnalisando(false); }
   }
 
-  async function aoTranscrever(base64: string) {
+  async function aoTranscrever(audio: AudioGravado) {
     setTranscrevendo(true);
     try {
-      const { texto } = await transcrever({ data: { audioBase64: base64 } });
+      const { texto } = await transcrever({ data: audio });
       if (!texto) {
         toast.error("Não entendemos o que foi dito. Tente falar mais perto do celular.");
         return;
@@ -278,8 +278,6 @@ function NovoProjeto() {
         copia[indice] = `${copia[indice] ? `${copia[indice]} ` : ""}${texto}`.trim();
         return copia;
       });
-    } catch (erro) {
-      toast.error(erro instanceof Error ? erro.message : "Não deu para ouvir o áudio.");
     } finally {
       setTranscrevendo(false);
     }

@@ -49,19 +49,23 @@ const opcoesRaciocinio = {
 export const transcreverAudio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ audioBase64: z.string().min(100) }).parse(input),
+    z.object({
+      audioBase64: z.string().min(100).max(15_000_000),
+      tipo: z.enum(["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"]).default("audio/wav"),
+    }).parse(input),
   )
   .handler(async ({ data, context }) => {
     await exigirAprovacao(context);
     const apiKey = pegarChave();
     const bytes = Uint8Array.from(atob(data.audioBase64), (c) => c.charCodeAt(0));
-    if (bytes.byteLength < 4000) {
+    if (bytes.byteLength < 1500) {
       throw new Error("A gravação ficou muito curta. Fale um pouco mais e tente de novo.");
     }
 
     const form = new FormData();
     form.append("model", "google/gemini-3.5-transcribe");
-    form.append("file", new Blob([bytes], { type: "audio/wav" }), "gravacao.wav");
+    const extensao = { "audio/webm": "webm", "audio/mp4": "m4a", "audio/ogg": "ogg", "audio/wav": "wav" }[data.tipo];
+    form.append("file", new Blob([bytes], { type: data.tipo }), `gravacao.${extensao}`);
     form.append("language", "pt");
 
     const resposta = await fetch(`${GATEWAY_URL}/audio/transcriptions`, {
