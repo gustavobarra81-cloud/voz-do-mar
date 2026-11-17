@@ -43,3 +43,13 @@ it("correção manual do texto volta para as partes", () => {
   const r = dividirHtml("<h2>T</h2>\n<h3>A</h3>\n<p>novo a</p>\n<h3>B</h3>\n<p>b</p>", s);
   expect(r.map((x) => x.html)).toEqual(["<p>novo a</p>", "<p>b</p>"]);
 });
+
+import { limparPerguntasExtras } from "./edital";
+describe("perguntas extras", () => {
+  it("devolve no máximo 5 perguntas", () => {
+    expect(limparPerguntasExtras(["a", "b", "c", "d", "e", "f", "g"])).toHaveLength(5);
+  });
+  it("remove vazias e repetidas", () => {
+    expect(limparPerguntasExtras(["Quanto custa?", " ", "quanto custa?", 3, "Qual o prazo?"])).toEqual(["Quanto custa?", "Qual o prazo?"]);
+  });
+});

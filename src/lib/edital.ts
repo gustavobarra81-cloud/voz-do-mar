@@ -82,3 +82,20 @@ export function dividirHtml(html: string, secoes: SecaoProjeto[]): SecaoProjeto[
   blocos.forEach((b, k) => { if (!usados.has(k) && b.nome) resultado.push({ nome: b.nome, conteudo: "", limite: "", html: b.html }); });
   return resultado;
 }
+
+/** Limpa as perguntas extras vindas da IA: sem vazias, sem repetidas, curtas, no máximo 5. */
+export function limparPerguntasExtras(perguntas: unknown): string[] {
+  if (!Array.isArray(perguntas)) return [];
+  const vistas = new Set<string>();
+  const saida: string[] = [];
+  for (const p of perguntas) {
+    if (typeof p !== "string") continue;
+    const texto = p.trim().replace(/\s+/g, " ").slice(0, 200);
+    const chave = texto.toLowerCase();
+    if (!texto || vistas.has(chave)) continue;
+    vistas.add(chave);
+    saida.push(texto);
+    if (saida.length === 5) break;
+  }
+  return saida;
+}

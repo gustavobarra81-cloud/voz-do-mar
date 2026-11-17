@@ -16,7 +16,7 @@ import { useAuth } from "@/lib/useAuth";
 import { useOrganizacoes } from "@/lib/useOrganizacoes";
 import { SeletorOrganizacao } from "@/components/SeletorOrganizacao";
 import { normalizarEstrutura } from "@/lib/edital";
-import { analisarEdital, planejarProjeto, lerEdital, sugerirIdeias, transcreverAudio } from "@/lib/projeto.functions";
+import { analisarEdital, perguntasFaltantes, planejarProjeto, lerEdital, sugerirIdeias, transcreverAudio } from "@/lib/projeto.functions";
 
 export const Route = createFileRoute("/novo")({
   head: () => ({
@@ -95,6 +95,11 @@ function NovoProjeto() {
   const [rascunhoCarregado, setRascunhoCarregado] = useState(false);
   const [ideias, setIdeias] = useState<Ideia[]>([]);
   const [gerandoIdeias, setGerandoIdeias] = useState(false);
+  // "Só falta isso": perguntas extras geradas a partir do que ainda falta no edital.
+  const [extras, setExtras] = useState<{ pergunta: string; resposta: string }[] | null>(null);
+  const [extrasBase, setExtrasBase] = useState("");
+  const [buscandoExtras, setBuscandoExtras] = useState(false);
+  const [indiceExtra, setIndiceExtra] = useState(0);
 
   useEffect(() => {
     if (!user || !organizacao) return;
@@ -110,6 +115,7 @@ function NovoProjeto() {
         try {
           const dados = JSON.parse(salvo) as {
             etapa?: number; indice?: number; editalId?: string; respostas?: string[];
+            extras?: { pergunta: string; resposta: string }[] | null; extrasBase?: string;
             checklist?: unknown; resumoAnalise?: string; analiseId?: string;
           };
           const { data: analiseSalva } = dados.analiseId
@@ -120,7 +126,8 @@ function NovoProjeto() {
              setRespostas(dados.respostas?.length === PERGUNTAS.length ? dados.respostas : PERGUNTAS.map(() => ""));
              setIndice(typeof dados.indice === "number" ? Math.max(0, Math.min(PERGUNTAS.length - 1, dados.indice)) : 0);
              setResumoAnalise(dados.resumoAnalise ?? "");
-             setEtapa(typeof dados.etapa === "number" ? Math.max(1, Math.min(3, dados.etapa)) : 1);
+             if (Array.isArray(dados.extras)) { setExtras(dados.extras); setExtrasBase(dados.extrasBase ?? ""); }
+             setEtapa(typeof dados.etapa === "number" ? Math.max(1, Math.min(4, dados.etapa)) : 1);
               if (antigo && !window.localStorage.getItem(chave)) window.localStorage.removeItem(`voz-do-mar:novo:${userId}`);
              setRascunhoCarregado(true);
             return;
@@ -156,25 +163,55 @@ function NovoProjeto() {
   useEffect(() => {
     if (!editalDoRadar || !rascunhoCarregado) return;
     setEtapa(0); setEditalId(editalDoRadar); setAnaliseId(null); setChecklist([]); setResumoAnalise("");
-    setRespostas(PERGUNTAS.map(() => "")); setIndice(0); setIdeias([]);
+    setRespostas(PERGUNTAS.map(() => "")); setIndice(0); setIdeias([]); setExtras(null); setExtrasBase("");
     void navigate({ to: "/novo", search: {}, replace: true });
   }, [editalDoRadar, rascunhoCarregado]);
 
   function trocarOrganizacao() {
     setRascunhoCarregado(false); setEtapa(0); setEditalId(null); setAnaliseId(null);
-    setChecklist([]); setResumoAnalise(""); setRespostas(PERGUNTAS.map(() => "")); setIndice(0); setIdeias([]);
+    setChecklist([]); setResumoAnalise(""); setRespostas(PERGUNTAS.map(() => "")); setIndice(0); setIdeias([]); setExtras(null); setExtrasBase("");
   }
 
   useEffect(() => {
     if (!user || !organizacao || !rascunhoCarregado) return;
-    window.localStorage.setItem(`voz-do-mar:novo:${user.id}:${organizacao.id}`, JSON.stringify({ etapa, indice, editalId, respostas, checklist, resumoAnalise, analiseId }));
-  }, [user?.id, organizacao?.id, rascunhoCarregado, etapa, indice, editalId, respostas, checklist, resumoAnalise, analiseId]);
+    window.localStorage.setItem(`voz-do-mar:novo:${user.id}:${organizacao.id}`, JSON.stringify({ etapa, indice, editalId, respostas, checklist, resumoAnalise, analiseId, extras, extrasBase }));
+  }, [user?.id, organizacao?.id, rascunhoCarregado, etapa, indice, editalId, respostas, checklist, resumoAnalise, analiseId, extras, extrasBase]);
 
   const transcrever = useServerFn(transcreverAudio);
   const importarEdital = useServerFn(lerEdital);
   const planejar = useServerFn(planejarProjeto);
   const analisar = useServerFn(analisarEdital);
   const sugerir = useServerFn(sugerirIdeias);
+  const buscarFaltantes = useServerFn(perguntasFaltantes);
+
+  async function irParaFaltantes() {
+    setEtapa(4);
+    const base = JSON.stringify([editalId, respostas]);
+    if (extras && extrasBase === base) return;
+    if (!editalId || !organizacao) return;
+    setBuscandoExtras(true);
+    try {
+      const { perguntas } = await buscarFaltantes({ data: {
+        editalId, organizacaoId: organizacao.id,
+        respostas: PERGUNTAS.map((p, i) => ({ pergunta: p, resposta: respostas[i] ?? "" })),
+      } });
+      setExtras(perguntas.map((pergunta) => ({ pergunta, resposta: "" })));
+      setExtrasBase(base); setIndiceExtra(0);
+      if (perguntas.length === 0) setEtapa(3);
+    } catch (erro) {
+      toast.error(erro instanceof Error ? erro.message : "Não conseguimos preparar as últimas perguntas.");
+      setExtras([]); setEtapa(3);
+    } finally { setBuscandoExtras(false); }
+  }
+
+  async function aoTranscreverExtra(audio: AudioGravado) {
+    setTranscrevendo(true);
+    try {
+      const { texto } = await transcrever({ data: audio });
+      if (!texto) { toast.error("Não entendemos o que foi dito. Tente falar mais perto do celular."); return; }
+      setExtras((atual) => atual?.map((e, i) => i === indiceExtra ? { ...e, resposta: `${e.resposta ? `${e.resposta} ` : ""}${texto}`.trim() } : e) ?? atual);
+    } finally { setTranscrevendo(false); }
+  }
 
   useEffect(() => {
     if (!carregando && !user) void navigate({ to: "/entrar" });
@@ -326,8 +363,11 @@ function NovoProjeto() {
           analise_id: analiseId,
           titulo: `Projeto — ${editalEscolhido.titulo}`.slice(0, 120),
           conteudo: "",
-          transcricao: respostas.join("\n\n"),
-          respostas: PERGUNTAS.map((p, i) => ({ pergunta: p, resposta: respostas[i] ?? "" })),
+          transcricao: [...respostas, ...(extras ?? []).map((e) => e.resposta)].filter((r) => r.trim()).join("\n\n"),
+          respostas: [
+            ...PERGUNTAS.map((p, i) => ({ pergunta: p, resposta: respostas[i] ?? "" })),
+            ...(extras ?? []).filter((e) => e.resposta.trim()),
+          ],
           status: "rascunho",
         })
         .select("id")
@@ -487,11 +527,52 @@ function NovoProjeto() {
                   Próxima <ArrowRight className="ml-2 size-5" />
                 </Button>
               ) : (
-                <Button className="h-14 flex-1 text-base" onClick={() => setEtapa(3)}>
+                <Button className="h-14 flex-1 text-base" onClick={() => void irParaFaltantes()}>
                   Terminei <Check className="ml-2 size-5" />
                 </Button>
               )}
             </div>
+          </section>
+        )}
+
+        {etapa === 4 && (
+          <section className="space-y-6">
+            <p className="font-bold text-primary">Só falta isso</p>
+            {buscandoExtras || !extras ? (
+              <div className="flex flex-col items-center gap-3 rounded-3xl bg-card p-8 text-center shadow-soft">
+                <Loader2 className="size-8 animate-spin text-primary" />
+                <p className="text-lg">Conferindo o que o edital pede e o que ainda falta...</p>
+              </div>
+            ) : extras.length > 0 && extras[indiceExtra] ? (
+              <>
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                    Pergunta extra {indiceExtra + 1} de {extras.length}
+                  </p>
+                  <h1 className="mt-2 text-3xl font-bold leading-snug">{extras[indiceExtra].pergunta}</h1>
+                  <p className="mt-2 text-muted-foreground">Se não souber agora, pode pular.</p>
+                </div>
+                <BotaoGravar aoTranscrever={aoTranscreverExtra} ocupado={transcrevendo} />
+                <Textarea
+                  rows={4}
+                  className="text-base"
+                  placeholder="Aperte o botão acima e fale. O texto aparece aqui."
+                  value={extras[indiceExtra].resposta}
+                  onChange={(e) => { const v = e.target.value; setExtras((atual) => atual?.map((x, i) => i === indiceExtra ? { ...x, resposta: v } : x) ?? atual); }}
+                />
+                <div className="flex gap-3">
+                  <Button variant="outline" className="h-14 flex-1 text-base" onClick={() => (indiceExtra === 0 ? setEtapa(2) : setIndiceExtra(indiceExtra - 1))}>
+                    <ArrowLeft className="mr-2 size-5" /> Voltar
+                  </Button>
+                  <Button className="h-14 flex-1 text-base" onClick={() => (indiceExtra < extras.length - 1 ? setIndiceExtra(indiceExtra + 1) : setEtapa(3))}>
+                    {extras[indiceExtra].resposta.trim() ? "Próxima" : "Pular"} <ArrowRight className="ml-2 size-5" />
+                  </Button>
+                </div>
+                <Button variant="ghost" className="w-full" onClick={() => setEtapa(3)}>Pular todas e continuar</Button>
+              </>
+            ) : (
+              <Button className="h-14 w-full text-base" onClick={() => setEtapa(3)}>Continuar <ArrowRight className="ml-2 size-5" /></Button>
+            )}
           </section>
         )}
 
@@ -517,11 +598,15 @@ function NovoProjeto() {
               ))}
             </div>
 
+            {(extras ?? []).filter((e) => e.resposta.trim()).map((e) => (
+              <Card key={e.pergunta}><CardContent className="pt-5"><p className="font-bold">{e.pergunta}</p><p className="mt-1 text-muted-foreground">{e.resposta}</p></CardContent></Card>
+            ))}
+
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 variant="outline"
                 className="h-16 text-base sm:flex-1"
-                onClick={() => setEtapa(2)}
+                onClick={() => setEtapa(extras && extras.length > 0 ? 4 : 2)}
               >
                 <ArrowLeft className="mr-2 size-5" /> Corrigir respostas
               </Button>

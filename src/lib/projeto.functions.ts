@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database, Json } from "@/integrations/supabase/types";
-import { instrucoesEstrutura, juntarHtml, LIMITE_TEXTO, montarSecoes, normalizarEstrutura, normalizarSecoesProjeto, SECAO_CRITERIOS } from "@/lib/edital";
+import { instrucoesEstrutura, juntarHtml, limparPerguntasExtras, LIMITE_TEXTO, montarSecoes, normalizarEstrutura, normalizarSecoesProjeto, SECAO_CRITERIOS } from "@/lib/edital";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1";
 
@@ -382,4 +382,60 @@ export const escreverSecao = createServerFn({ method: "POST" })
     }).eq("id", data.projetoId);
     if (error) throw new Error("Não conseguimos salvar essa parte.");
     return { ok: true, pronto };
+  });
+
+/* ------------------------------------------------------------------ */
+/* "Só falta isso": perguntas sobre o que ainda falta                   */
+/* ------------------------------------------------------------------ */
+
+const FaltaInput = z.object({
+  editalId: z.string().uuid(),
+  organizacaoId: z.string().uuid(),
+  respostas: z.array(z.object({ pergunta: z.string().max(500), resposta: z.string().max(20_000) })).max(20),
+});
+
+export const perguntasFaltantes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => FaltaInput.parse(input))
+  .handler(async ({ data, context }) => {
+    await exigirAprovacao(context);
+    const { data: edital } = await context.supabase.from("editais")
+      .select("titulo, resumo, exigencias, valor_maximo, prazo, texto_completo, criterios")
+      .eq("id", data.editalId).maybeSingle();
+    if (!edital) throw new Error("Não encontramos o edital.");
+    const organizacao = await organizacaoSegura(context.supabase, data.organizacaoId);
+    const falas = data.respostas.filter((r) => r.resposta.trim())
+      .map((r) => `Pergunta: ${r.pergunta}\nResposta: ${r.resposta}`).join("\n\n");
+
+    const lovable = criarModelo(pegarChave());
+    const resultado = streamText({
+      model: lovable.responses("openai/gpt-6-astra"),
+      providerOptions: opcoesRaciocinio,
+      system: [
+        "Você ajuda pescadores artesanais com pouca leitura a completar um projeto para edital.",
+        "Compare o que a comunidade já contou com as seções e critérios de pontuação do edital e descubra o que AINDA FALTA para escrever o projeto sem lacunas: números (pessoas, famílias, quantidades), prazos e datas, valores e custos, parceiros e apoios, local.",
+        "Faça no máximo 5 perguntas, as mais importantes para a pontuação. Cada pergunta: curta (até 20 palavras), uma coisa só, linguagem simples do dia a dia, sem termos técnicos, falando com 'você' ou 'vocês'.",
+        "Não pergunte o que já foi respondido nem o que está nos dados da organização. Nunca peça CPF, telefone, e-mail ou endereço.",
+        "Se nada importante faltar, devolva lista vazia. Responda somente JSON válido, sem markdown.",
+      ].join(" "),
+      prompt: [
+        'Formato: {"perguntas":["..."]}',
+        `EDITAL: ${edital.titulo}`,
+        edital.resumo ? `SOBRE: ${edital.resumo}` : "",
+        edital.valor_maximo ? `VALOR: ${edital.valor_maximo}` : "",
+        edital.exigencias ? `EXIGÊNCIAS: ${edital.exigencias}` : "",
+        instrucoesEstrutura(normalizarEstrutura(edital.criterios)),
+        edital.texto_completo ? `TRECHO DO EDITAL:\n"""\n${edital.texto_completo.slice(0, 60_000)}\n"""` : "",
+        `ORGANIZAÇÃO: ${JSON.stringify(organizacao)}`,
+        "O QUE A COMUNIDADE JÁ CONTOU:", falas || "(nada)",
+      ].filter(Boolean).join("\n"),
+    });
+    const texto = (await resultado.text).replace(/```json|```/g, "").trim();
+    try {
+      const inicio = texto.indexOf("{"); const fim = texto.lastIndexOf("}");
+      const json = JSON.parse(texto.slice(inicio, fim + 1)) as { perguntas?: unknown };
+      return { perguntas: limparPerguntasExtras(json.perguntas) };
+    } catch {
+      throw new Error("Não conseguimos preparar as últimas perguntas. Você pode pular esta etapa.");
+    }
   });
