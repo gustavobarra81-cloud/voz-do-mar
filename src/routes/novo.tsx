@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/useAuth";
 import { useOrganizacoes } from "@/lib/useOrganizacoes";
 import { SeletorOrganizacao } from "@/components/SeletorOrganizacao";
+import { normalizarEstrutura } from "@/lib/edital";
 import { analisarEdital, escreverProjeto, lerEdital, sugerirIdeias, transcreverAudio } from "@/lib/projeto.functions";
 
 export const Route = createFileRoute("/novo")({
@@ -59,6 +60,7 @@ type Edital = {
   prazo: string | null;
   arquivo_path?: string | null;
   organizacao_id: string | null;
+  criterios?: unknown;
 };
 
 type ItemAnalise = { requisito: string; situacao: "atendido" | "pendente" | "nao_localizado"; evidencia: string; orientacao: string };
@@ -183,7 +185,7 @@ function NovoProjeto() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("editais")
-        .select("id, titulo, orgao, resumo, exigencias, valor_maximo, prazo, arquivo_path, organizacao_id")
+        .select("id, titulo, orgao, resumo, exigencias, valor_maximo, prazo, arquivo_path, organizacao_id, criterios")
         .or(`publico.eq.true,criado_por.eq.${user?.id ?? "00000000-0000-0000-0000-000000000000"}`)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -319,12 +321,8 @@ function NovoProjeto() {
     try {
       const { html, titulo } = await gerar({
         data: {
-          editalTitulo: editalEscolhido.titulo,
-          editalOrgao: editalEscolhido.orgao,
-          editalResumo: editalEscolhido.resumo,
-          editalExigencias: editalEscolhido.exigencias,
-          editalValor: editalEscolhido.valor_maximo,
-          organizacao: { ...organizacao },
+          editalId: editalEscolhido.id,
+          organizacaoId: organizacao.id,
           checklist,
           respostas: PERGUNTAS.map((pergunta, i) => ({
             pergunta,
@@ -444,7 +442,7 @@ function NovoProjeto() {
         {etapa === 1 && (
           <section className="space-y-6">
             <div><p className="font-bold text-primary">Resultado da conferência</p><h1 className="mt-1 text-3xl font-bold">Checklist do edital</h1><p className="mt-2 text-muted-foreground">{resumoAnalise}</p></div>
-            {editalEscolhido && <Card><CardContent className="space-y-4 py-5"><h2 className="text-lg font-bold">Informações lidas no edital</h2><div className="space-y-2"><Label>Título</Label><Input value={editalEscolhido.titulo} onChange={(e) => { const valor = e.target.value; void supabase.from("editais").update({ titulo: valor }).eq("id", editalEscolhido.id); void refetch(); }} /></div><div className="space-y-2"><Label>Exigências encontradas</Label><Textarea value={editalEscolhido.exigencias ?? ""} onChange={(e) => { const valor = e.target.value; void supabase.from("editais").update({ exigencias: valor }).eq("id", editalEscolhido.id); void refetch(); }} /></div><Button variant="outline" className="w-full" disabled={analisando} onClick={() => void analisarCompatibilidade()}>{analisando && <Loader2 className="mr-2 size-4 animate-spin" />}Salvar correções e analisar novamente</Button></CardContent></Card>}
+            {editalEscolhido && <Card><CardContent className="space-y-4 py-5"><h2 className="text-lg font-bold">Informações lidas no edital</h2><div className="space-y-2"><Label>Título</Label><Input value={editalEscolhido.titulo} onChange={(e) => { const valor = e.target.value; void supabase.from("editais").update({ titulo: valor }).eq("id", editalEscolhido.id); void refetch(); }} /></div><div className="space-y-2"><Label>Exigências encontradas</Label><Textarea value={editalEscolhido.exigencias ?? ""} onChange={(e) => { const valor = e.target.value; void supabase.from("editais").update({ exigencias: valor }).eq("id", editalEscolhido.id); void refetch(); }} /></div><EstruturaLida valor={editalEscolhido.criterios} /><Button variant="outline" className="w-full" disabled={analisando} onClick={() => void analisarCompatibilidade()}>{analisando && <Loader2 className="mr-2 size-4 animate-spin" />}Salvar correções e analisar novamente</Button></CardContent></Card>}
             <div className="space-y-3">{checklist.map((item, i) => {
               const visual = item.situacao === "atendido" ? { Icone: CheckCircle2, texto: "Atendido", classe: "text-primary" } : item.situacao === "pendente" ? { Icone: AlertTriangle, texto: "Pendente", classe: "text-destructive" } : { Icone: HelpCircle, texto: "Não localizado", classe: "text-muted-foreground" };
               return <Card key={`${item.requisito}-${i}`}><CardContent className="py-5"><div className="flex items-start gap-3"><visual.Icone className={`mt-1 size-5 shrink-0 ${visual.classe}`} /><div><p className="font-bold">{item.requisito}</p><p className={`text-sm font-bold ${visual.classe}`}>{visual.texto}</p>{item.evidencia && <p className="mt-2 text-sm">{item.evidencia}</p>}{item.orientacao && <p className="mt-1 text-sm text-muted-foreground">{item.orientacao}</p>}</div></div></CardContent></Card>;
@@ -562,6 +560,25 @@ function NovoProjeto() {
           </section>
         )}
       </main>
+    </div>
+  );
+}
+
+function EstruturaLida({ valor }: { valor: unknown }) {
+  const { secoes, criterios } = normalizarEstrutura(valor);
+  if (secoes.length === 0 && criterios.length === 0) return null;
+  return (
+    <div className="space-y-3 text-sm">
+      {secoes.length > 0 && (
+        <div><Label>Seções que o projeto deve ter</Label>
+          <ol className="mt-1 list-decimal space-y-1 pl-5">{secoes.map((s, i) => <li key={i}><strong>{s.nome}</strong>{s.limite && <span className="text-muted-foreground"> — limite: {s.limite}</span>}{s.conteudo && <div className="text-muted-foreground">{s.conteudo}</div>}</li>)}</ol>
+        </div>
+      )}
+      {criterios.length > 0 && (
+        <div><Label>Como o projeto será pontuado</Label>
+          <ul className="mt-1 space-y-1">{criterios.map((c, i) => <li key={i} className="flex justify-between gap-3 border-b border-border pb-1"><span>{c.nome}</span>{c.pontuacao_maxima && <strong className="shrink-0">{c.pontuacao_maxima} pts</strong>}</li>)}</ul>
+        </div>
+      )}
     </div>
   );
 }

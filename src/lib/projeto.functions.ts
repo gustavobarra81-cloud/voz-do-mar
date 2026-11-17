@@ -4,7 +4,8 @@ import { streamText } from "ai";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
+import { instrucoesEstrutura, LIMITE_TEXTO, normalizarEstrutura } from "@/lib/edital";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1";
 
@@ -109,9 +110,13 @@ export const lerEdital = createServerFn({ method: "POST" })
               type: "text",
               text: [
                 "Leia este edital brasileiro e responda SOMENTE com um JSON válido, sem comentários e sem blocos de código, no formato:",
-                '{"titulo":"","orgao":"","resumo":"","prazo":"AAAA-MM-DD ou vazio","valor_maximo":"","exigencias":""}',
+                '{"titulo":"","orgao":"","resumo":"","prazo":"AAAA-MM-DD ou vazio","valor_maximo":"","exigencias":"","secoes":[{"nome":"","conteudo":"","limite":""}],"criterios":[{"nome":"","descricao":"","pontuacao_maxima":""}],"texto_completo":""}',
                 "- resumo: 2 a 3 frases em linguagem simples.",
-                "- exigencias: liste as seções obrigatórias do projeto, critérios de avaliação e quem pode participar, em texto corrido separado por ponto e vírgula.",
+                "- exigencias: quem pode participar e documentos exigidos, em texto corrido separado por ponto e vírgula.",
+                "- secoes: TODAS as seções obrigatórias da proposta/projeto, na ordem do edital (ou do formulário/anexo), com o nome exato, o que deve conter e o limite de tamanho (caracteres, linhas, páginas) se houver; senão limite vazio. Lista vazia se o edital não definir.",
+                "- criterios: TODOS os critérios de avaliação/pontuação, com nome, o que é avaliado e a pontuação máxima. Lista vazia se não houver.",
+                "- texto_completo: transcrição fiel e integral do texto do edital, sem resumir (pode omitir só cabeçalhos/rodapés repetidos).",
+                "Nunca invente seções, critérios ou pontuações que não estejam no documento.",
               ].join("\n"),
             },
             {
@@ -132,7 +137,10 @@ export const lerEdital = createServerFn({ method: "POST" })
 
     try {
       const bruto = JSON.parse(limpo.slice(inicio, fim + 1)) as Record<string, string>;
+      const estrutura = normalizarEstrutura({ secoes: (bruto as Record<string, unknown>)["secoes"], criterios: (bruto as Record<string, unknown>)["criterios"] });
       return {
+        texto_completo: (bruto["texto_completo"] || "").slice(0, LIMITE_TEXTO) || null,
+        criterios: estrutura as unknown as Json,
         titulo: bruto["titulo"] || data.nomeArquivo.replace(/\.pdf$/i, ""),
         orgao: bruto["orgao"] || "",
         resumo: bruto["resumo"] || "",
@@ -248,12 +256,8 @@ export const sugerirIdeias = createServerFn({ method: "POST" })
 /* ------------------------------------------------------------------ */
 
 const ProjetoInput = z.object({
-  editalTitulo: z.string(),
-  editalOrgao: z.string().nullable(),
-  editalResumo: z.string().nullable(),
-  editalExigencias: z.string().nullable(),
-  editalValor: z.string().nullable(),
-  organizacao: z.record(z.string(), z.unknown()),
+  editalId: z.string().uuid(),
+  organizacaoId: z.string().uuid(),
   checklist: z.array(z.object({ requisito: z.string(), situacao: z.string(), evidencia: z.string(), orientacao: z.string() })),
   respostas: z.array(z.object({ pergunta: z.string(), resposta: z.string() })).min(1),
 });
@@ -263,8 +267,22 @@ export const escreverProjeto = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => ProjetoInput.parse(input))
   .handler(async ({ data, context }) => {
     await exigirAprovacao(context);
-    const apiKey = pegarChave();
-    const lovable = criarModelo(apiKey);
+    const { data: edital } = await context.supabase
+      .from("editais")
+      .select("titulo, orgao, resumo, exigencias, valor_maximo, prazo, texto_completo, criterios")
+      .eq("id", data.editalId)
+      .maybeSingle();
+    if (!edital) throw new Error("Não encontramos esse edital. Escolha o edital de novo.");
+    const { data: org } = await context.supabase
+      .from("organizacoes")
+      .select("*")
+      .eq("id", data.organizacaoId)
+      .maybeSingle();
+    if (!org) throw new Error("Não encontramos a organização selecionada.");
+    const { id: _id, owner_id: _o, created_at: _c, updated_at: _u, ...organizacao } = org;
+
+    const estrutura = normalizarEstrutura(edital.criterios);
+    const lovable = criarModelo(pegarChave());
 
     const falas = data.respostas
       .filter((r) => r.resposta.trim().length > 0)
@@ -277,24 +295,28 @@ export const escreverProjeto = createServerFn({ method: "POST" })
       system: [
         "Você é um redator experiente de projetos sociais e socioambientais no Brasil, especialista em editais públicos e em pesca artesanal.",
         "Escreva projetos completos, formais e prontos para submissão, sempre em português do Brasil.",
+        "Siga exatamente a estrutura de seções exigida pelo edital e responda de forma explícita a cada critério de pontuação, para maximizar a nota.",
         "Use SOMENTE as informações cadastradas da organização, comprovadas no checklist ou contadas pela comunidade. Onde faltar dado (valores, datas, número de pessoas), escreva um marcador entre colchetes, por exemplo [COMPLETAR: número de famílias].",
-        "Nunca invente nomes, CNPJ, telefones, endereços ou valores.",
+        "Nunca invente nomes, CNPJ, telefones, endereços, experiências ou valores.",
         "Responda em HTML simples usando apenas as tags h2, h3, p, ul, li, ol, table, tr, th, td e strong. Não use markdown nem ```.",
       ].join(" "),
       prompt: [
-        `EDITAL: ${data.editalTitulo}`,
-        data.editalOrgao ? `ÓRGÃO: ${data.editalOrgao}` : "",
-        data.editalResumo ? `SOBRE O EDITAL: ${data.editalResumo}` : "",
-        data.editalValor ? `VALOR: ${data.editalValor}` : "",
-        data.editalExigencias ? `EXIGÊNCIAS DO EDITAL: ${data.editalExigencias}` : "",
-        `DADOS CADASTRADOS DA ORGANIZAÇÃO: ${JSON.stringify(data.organizacao)}`,
+        `EDITAL: ${edital.titulo}`,
+        edital.orgao ? `ÓRGÃO: ${edital.orgao}` : "",
+        edital.resumo ? `SOBRE O EDITAL: ${edital.resumo}` : "",
+        edital.valor_maximo ? `VALOR: ${edital.valor_maximo}` : "",
+        edital.exigencias ? `EXIGÊNCIAS DO EDITAL: ${edital.exigencias}` : "",
+        edital.texto_completo ? `TEXTO COMPLETO DO EDITAL:\n"""\n${edital.texto_completo.slice(0, LIMITE_TEXTO)}\n"""` : "",
+        "",
+        instrucoesEstrutura(estrutura),
+        "",
+        `DADOS CADASTRADOS DA ORGANIZAÇÃO: ${JSON.stringify(organizacao)}`,
         `CHECKLIST DA ANÁLISE: ${JSON.stringify(data.checklist)}`,
         "",
         "O QUE A COMUNIDADE CONTOU (transcrição da fala):",
         falas,
         "",
-        "Escreva o projeto completo seguindo exatamente as seções exigidas pelo edital. Se o edital não listar seções, use: Identificação do proponente; Justificativa; Objetivo geral; Objetivos específicos; Público beneficiado; Metodologia; Metas e cronograma; Orçamento estimado (em tabela); Resultados esperados; Sustentabilidade após o projeto.",
-        "Comece com um <h2> com um título forte para o projeto. Cada seção deve ter pelo menos dois parágrafos consistentes.",
+        "Comece com um <h2> com um título forte para o projeto. Cada seção deve ter conteúdo consistente, dentro do limite indicado.",
       ]
         .filter(Boolean)
         .join("\n"),
