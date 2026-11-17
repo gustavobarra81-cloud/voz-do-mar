@@ -27,9 +27,13 @@ function pegarChave() {
   return key;
 }
 
-async function exigirAprovacao(context: { supabase: SupabaseClient<Database>; userId: string }) {
+async function exigirAprovacao(context: { supabase: SupabaseClient<Database>; userId: string }, usaIa = true) {
   const { data } = await context.supabase.rpc("is_approved", { _user_id: context.userId });
   if (!data) throw new Error("Seu cadastro ainda precisa ser aprovado.");
+  if (!usaIa) return;
+  const { data: uso, error } = await context.supabase.rpc("registrar_uso_ia");
+  if (error) throw new Error("Não foi possível verificar seu limite de uso. Tente novamente.");
+  if (uso === -1) throw new Error("Você atingiu o limite diário de uso da inteligência artificial. Tente novamente amanhã — tudo o que já foi feito está salvo.");
 }
 
 const opcoesRaciocinio = {
@@ -50,7 +54,7 @@ export const transcreverAudio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({
-      audioBase64: z.string().min(100).max(15_000_000),
+      audioBase64: z.string().min(100).max(9_000_000),
       tipo: z.enum(["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"]).default("audio/wav"),
     }).parse(input),
   )
@@ -92,8 +96,8 @@ export const transcreverAudio = createServerFn({ method: "POST" })
 /* ------------------------------------------------------------------ */
 
 const EditalInput = z.object({
-  nomeArquivo: z.string(),
-  pdfBase64: z.string().min(100),
+  nomeArquivo: z.string().max(255),
+  pdfBase64: z.string().min(100).max(16_500_000),
 });
 
 export const lerEdital = createServerFn({ method: "POST" })
@@ -164,11 +168,11 @@ export const lerEdital = createServerFn({ method: "POST" })
 
 const AnaliseInput = z.object({
   edital: z.object({
-    titulo: z.string(), orgao: z.string().nullable(), resumo: z.string().nullable(),
-    exigencias: z.string().nullable(), valor_maximo: z.string().nullable(), prazo: z.string().nullable(),
+    titulo: z.string().max(5000), orgao: z.string().max(5000).nullable(), resumo: z.string().max(5000).nullable(),
+    exigencias: z.string().max(20_000).nullable(), valor_maximo: z.string().max(5000).nullable(), prazo: z.string().max(5000).nullable(),
   }),
   organizacaoId: z.string().uuid(),
-  documentos: z.array(z.object({ categoria: z.string(), nome: z.string(), data_validade: z.string().nullable() })),
+  documentos: z.array(z.object({ categoria: z.string().max(5000), nome: z.string().max(5000), data_validade: z.string().max(5000).nullable() })).max(300),
 });
 
 /** Carrega a organização no servidor e devolve só os campos permitidos para a IA. */
@@ -223,9 +227,9 @@ export const analisarEdital = createServerFn({ method: "POST" })
 /* ------------------------------------------------------------------ */
 
 const IdeiasInput = z.object({
-  edital: z.object({ titulo: z.string(), orgao: z.string().nullable(), resumo: z.string().nullable(), exigencias: z.string().nullable(), valor_maximo: z.string().nullable() }),
+  edital: z.object({ titulo: z.string().max(5000), orgao: z.string().max(5000).nullable(), resumo: z.string().max(5000).nullable(), exigencias: z.string().max(20_000).nullable(), valor_maximo: z.string().max(5000).nullable() }),
   organizacaoId: z.string().uuid(),
-  checklist: z.array(z.object({ requisito: z.string(), situacao: z.string(), evidencia: z.string(), orientacao: z.string() })),
+  checklist: z.array(z.object({ requisito: z.string().max(5000), situacao: z.string().max(5000), evidencia: z.string().max(5000), orientacao: z.string().max(5000) })).max(150),
 });
 
 export const sugerirIdeias = createServerFn({ method: "POST" })
@@ -288,7 +292,7 @@ export const planejarProjeto = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ projetoId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await exigirAprovacao(context);
+    await exigirAprovacao(context, false);
     const { projeto, edital } = await carregarProjeto(context.supabase, data.projetoId);
     if (normalizarSecoesProjeto(projeto.secoes).length > 0) return { total: normalizarSecoesProjeto(projeto.secoes).length };
     const secoes = montarSecoes(normalizarEstrutura(edital.criterios));
@@ -301,7 +305,7 @@ export const planejarProjeto = createServerFn({ method: "POST" })
 
 const SecaoInput = z.object({
   projetoId: z.string().uuid(),
-  indice: z.number().int().min(0),
+  indice: z.number().int().min(0).max(100),
   instrucao: z.string().max(4000).optional(),
 });
 

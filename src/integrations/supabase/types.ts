@@ -473,6 +473,27 @@ export type Database = {
         }
         Relationships: []
       }
+      uso_ia: {
+        Row: {
+          chamadas: number
+          dia: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chamadas?: number
+          dia: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chamadas?: number
+          dia?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -488,6 +509,7 @@ export type Database = {
         Returns: boolean
       }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      registrar_uso_ia: { Args: never; Returns: number }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"

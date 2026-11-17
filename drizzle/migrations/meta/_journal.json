@@ -57,6 +57,13 @@
       "when": 1794877606450,
       "tag": "0007_politica_privacidade_aceite",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794878978603,
+      "tag": "0008_editais_publicos_admin_e_limite_ia",
+      "breakpoints": true
     }
   ]
 }
