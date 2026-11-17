@@ -65,3 +65,20 @@ export function juntarHtml(titulo: string, secoes: SecaoProjeto[]): string {
 export function proximaSecaoVazia(secoes: SecaoProjeto[]): number {
   return secoes.findIndex((s) => !s.html.trim());
 }
+
+/** Aplica uma edição manual do texto completo de volta às partes (pelos títulos <h3>). */
+export function dividirHtml(html: string, secoes: SecaoProjeto[]): SecaoProjeto[] {
+  const blocos = html.split(/<h3[^>]*>/i).slice(1).map((b) => {
+    const fim = b.search(/<\/h3>/i);
+    return { nome: b.slice(0, fim).replace(/<[^>]+>/g, "").trim(), html: b.slice(fim + 5).trim() };
+  });
+  const usados = new Set<number>();
+  const resultado = secoes.map((s) => {
+    const i = blocos.findIndex((b, k) => !usados.has(k) && b.nome === s.nome);
+    if (i < 0) return s;
+    usados.add(i);
+    return { ...s, html: blocos[i]!.html };
+  });
+  blocos.forEach((b, k) => { if (!usados.has(k) && b.nome) resultado.push({ nome: b.nome, conteudo: "", limite: "", html: b.html }); });
+  return resultado;
+}

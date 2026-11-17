@@ -36,3 +36,10 @@ describe("partes do projeto", () => {
     expect(juntarHtml("T", s)).toBe("<h2>T</h2>\n<h3>A</h3>\n<p>a</p>");
   });
 });
+
+import { dividirHtml } from "./edital";
+it("correção manual do texto volta para as partes", () => {
+  const s = [{ nome: "A", conteudo: "", limite: "", html: "<p>a</p>" }, { nome: "B", conteudo: "", limite: "", html: "<p>b</p>" }];
+  const r = dividirHtml("<h2>T</h2>\n<h3>A</h3>\n<p>novo a</p>\n<h3>B</h3>\n<p>b</p>", s);
+  expect(r.map((x) => x.html)).toEqual(["<p>novo a</p>", "<p>b</p>"]);
+});

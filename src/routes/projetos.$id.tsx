@@ -7,11 +7,12 @@ import { ArrowLeft, Download, Loader2, PenLine, Printer, RotateCcw, Save } from 
 import { BotaoGravar } from "@/components/BotaoGravar";
 import { Progress } from "@/components/ui/progress";
 import { escreverSecao, transcreverAudio } from "@/lib/projeto.functions";
-import { normalizarSecoesProjeto, proximaSecaoVazia, type SecaoProjeto } from "@/lib/edital";
+import { dividirHtml, normalizarSecoesProjeto, proximaSecaoVazia, type SecaoProjeto } from "@/lib/edital";
 import { Cabecalho } from "@/components/Cabecalho";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { useAuth } from "@/lib/useAuth";
 
 export const Route = createFileRoute("/projetos/$id")({
@@ -104,7 +105,7 @@ function VerProjeto() {
     setSalvando(true);
     const { error } = await supabase
       .from("projetos")
-      .update({ conteudo: rascunho, updated_at: new Date().toISOString() })
+      .update({ conteudo: rascunho, ...(secoes.length > 0 ? { secoes: dividirHtml(rascunho, secoes) as unknown as Json } : {}), updated_at: new Date().toISOString() })
       .eq("id", id);
     setSalvando(false);
     if (error) {
