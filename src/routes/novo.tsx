@@ -52,6 +52,7 @@ const PERGUNTAS = [
 
 type Edital = {
   id: string;
+  publico?: boolean;
   titulo: string;
   orgao: string | null;
   resumo: string | null;
@@ -222,7 +223,7 @@ function NovoProjeto() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("editais")
-        .select("id, titulo, orgao, resumo, exigencias, valor_maximo, prazo, arquivo_path, organizacao_id, criterios")
+        .select("id, titulo, orgao, resumo, exigencias, valor_maximo, prazo, arquivo_path, organizacao_id, criterios, publico")
         .or(`publico.eq.true,criado_por.eq.${user?.id ?? "00000000-0000-0000-0000-000000000000"}`)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -239,6 +240,13 @@ function NovoProjeto() {
     () => editais?.find((e) => e.id === editalId && (e.organizacao_id === organizacao?.id || !e.organizacao_id)) ?? null,
     [editais, editalId, organizacao?.id],
   );
+  const [tituloEditado, setTituloEditado] = useState("");
+  const [exigenciasEditadas, setExigenciasEditadas] = useState("");
+  useEffect(() => {
+    setTituloEditado(editalEscolhido?.titulo ?? "");
+    setExigenciasEditadas(editalEscolhido?.exigencias ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editalEscolhido?.id]);
 
   async function enviarPdf(arquivo: File) {
     if (arquivo.size > 12_000_000) {
@@ -283,17 +291,54 @@ function NovoProjeto() {
     }
   }
 
-  async function analisarCompatibilidade() {
-    if (!editalEscolhido || !organizacao) return;
+  async function salvarCorrecoesEAnalisar() {
+    if (!editalEscolhido || !organizacao || !user) return;
+    const titulo = tituloEditado.trim();
+    if (!titulo) { toast.error("O título do edital não pode ficar vazio."); return; }
+    const mudou = titulo !== editalEscolhido.titulo || exigenciasEditadas !== (editalEscolhido.exigencias ?? "");
+    if (!mudou) { await analisarCompatibilidade(); return; }
+    setAnalisando(true);
+    let alvo: Edital;
+    try {
+      if (editalEscolhido.publico) {
+        const { data: original, error: erroLeitura } = await supabase.from("editais").select("*").eq("id", editalEscolhido.id).single();
+        if (erroLeitura) throw erroLeitura;
+        const { id: _id, created_at: _c, ...resto } = original;
+        const { data: copia, error } = await supabase.from("editais")
+          .insert({ ...resto, titulo, exigencias: exigenciasEditadas, publico: false, criado_por: user.id, organizacao_id: organizacao.id })
+          .select("id, titulo, orgao, resumo, exigencias, valor_maximo, prazo, arquivo_path, organizacao_id, criterios, publico").single();
+        if (error) throw error;
+        alvo = copia as Edital;
+      } else {
+        const { data: atualizado, error } = await supabase.from("editais")
+          .update({ titulo, exigencias: exigenciasEditadas }).eq("id", editalEscolhido.id)
+          .select("id, titulo, orgao, resumo, exigencias, valor_maximo, prazo, arquivo_path, organizacao_id, criterios, publico").single();
+        if (error) throw error;
+        alvo = atualizado as Edital;
+      }
+    } catch {
+      toast.error("Não conseguimos salvar as correções. Verifique a internet e tente de novo.");
+      setAnalisando(false);
+      return;
+    }
+    await refetch();
+    setEditalId(alvo.id);
+    toast.success(editalEscolhido.publico ? "Correções salvas numa cópia só da sua organização." : "Correções salvas.");
+    await analisarCompatibilidade(alvo);
+  }
+
+  async function analisarCompatibilidade(editalAlvo?: Edital) {
+    const ed = editalAlvo ?? editalEscolhido;
+    if (!ed || !organizacao) return;
     setAnalisando(true);
     try {
       const resultado = await analisar({ data: {
-        edital: { ...editalEscolhido, prazo: editalEscolhido.prazo },
+        edital: { titulo: ed.titulo, orgao: ed.orgao, resumo: ed.resumo, exigencias: ed.exigencias, valor_maximo: ed.valor_maximo, prazo: ed.prazo },
         organizacaoId: organizacao.id,
         documentos: documentos ?? [],
       } });
       const { data, error } = await supabase.from("analises_editais").upsert({
-        organizacao_id: organizacao.id, edital_id: editalEscolhido.id,
+        organizacao_id: organizacao.id, edital_id: ed.id,
         checklist: resultado.itens, resumo: resultado.resumo, updated_at: new Date().toISOString(),
       }, { onConflict: "organizacao_id,edital_id" }).select("id").single();
       if (error) throw error;
@@ -469,7 +514,7 @@ function NovoProjeto() {
         {etapa === 1 && (
           <section className="space-y-6">
             <div><p className="font-bold text-primary">Resultado da conferência</p><h1 className="mt-1 text-3xl font-bold">Checklist do edital</h1><p className="mt-2 text-muted-foreground">{resumoAnalise}</p></div>
-            {editalEscolhido && <Card><CardContent className="space-y-4 py-5"><h2 className="text-lg font-bold">Informações lidas no edital</h2><div className="space-y-2"><Label>Título</Label><Input value={editalEscolhido.titulo} onChange={(e) => { const valor = e.target.value; void supabase.from("editais").update({ titulo: valor }).eq("id", editalEscolhido.id); void refetch(); }} /></div><div className="space-y-2"><Label>Exigências encontradas</Label><Textarea value={editalEscolhido.exigencias ?? ""} onChange={(e) => { const valor = e.target.value; void supabase.from("editais").update({ exigencias: valor }).eq("id", editalEscolhido.id); void refetch(); }} /></div><EstruturaLida valor={editalEscolhido.criterios} /><Button variant="outline" className="w-full" disabled={analisando} onClick={() => void analisarCompatibilidade()}>{analisando && <Loader2 className="mr-2 size-4 animate-spin" />}Salvar correções e analisar novamente</Button></CardContent></Card>}
+            {editalEscolhido && <Card><CardContent className="space-y-4 py-5"><h2 className="text-lg font-bold">Informações lidas no edital</h2><div className="space-y-2"><Label>Título</Label><Input value={tituloEditado} onChange={(e) => setTituloEditado(e.target.value)} /></div><div className="space-y-2"><Label>Exigências encontradas</Label><Textarea value={exigenciasEditadas} onChange={(e) => setExigenciasEditadas(e.target.value)} />{editalEscolhido.publico && <p className="text-sm text-muted-foreground">Este edital é compartilhado. Ao salvar, criamos uma cópia só da sua organização com as suas correções.</p>}</div><EstruturaLida valor={editalEscolhido.criterios} /><Button variant="outline" className="w-full" disabled={analisando} onClick={() => void salvarCorrecoesEAnalisar()}>{analisando && <Loader2 className="mr-2 size-4 animate-spin" />}Salvar correções e analisar novamente</Button></CardContent></Card>}
             <div className="space-y-3">{checklist.map((item, i) => {
               const visual = item.situacao === "atendido" ? { Icone: CheckCircle2, texto: "Atendido", classe: "text-primary" } : item.situacao === "pendente" ? { Icone: AlertTriangle, texto: "Pendente", classe: "text-destructive" } : { Icone: HelpCircle, texto: "Não localizado", classe: "text-muted-foreground" };
               return <Card key={`${item.requisito}-${i}`}><CardContent className="py-5"><div className="flex items-start gap-3"><visual.Icone className={`mt-1 size-5 shrink-0 ${visual.classe}`} /><div><p className="font-bold">{item.requisito}</p><p className={`text-sm font-bold ${visual.classe}`}>{visual.texto}</p>{item.evidencia && <p className="mt-2 text-sm">{item.evidencia}</p>}{item.orientacao && <p className="mt-1 text-sm text-muted-foreground">{item.orientacao}</p>}</div></div></CardContent></Card>;
