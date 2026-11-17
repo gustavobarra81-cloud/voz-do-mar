@@ -126,6 +126,9 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <footer className="nao-imprimir border-t border-border py-6 text-center text-base text-muted-foreground">
+        Voz do Mar · <Link to="/privacidade" className="text-primary underline">Política de Privacidade</Link>
+      </footer>
       <Toaster position="top-center" richColors />
     </QueryClientProvider>
   );

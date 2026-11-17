@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/useAuth";
 
 export function Cabecalho() {
-  const { user, carregando, aprovado, isAdmin } = useAuth();
+  const { user, carregando, aprovado, isAdmin, politicaAceita } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { data: pendentes } = useQuery({
@@ -16,8 +16,10 @@ export function Cabecalho() {
   });
 
   useEffect(() => {
-    if (!carregando && user && !aprovado && pathname !== "/aguardando") void navigate({ to: "/aguardando" });
-  }, [carregando, user, aprovado, pathname, navigate]);
+    if (carregando || !user || pathname === "/privacidade") return;
+    if (!politicaAceita) { if (pathname !== "/aceite") void navigate({ to: "/aceite" }); return; }
+    if (!aprovado && pathname !== "/aguardando") void navigate({ to: "/aguardando" });
+  }, [carregando, user, aprovado, politicaAceita, pathname, navigate]);
 
   return (
     <header className="nao-imprimir border-b border-border bg-card/80 backdrop-blur">

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Cabecalho } from "@/components/Cabecalho";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,6 +40,7 @@ function Entrar() {
   const [senha, setSenha] = useState("");
   const [nome, setNome] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  const [aceitou, setAceitou] = useState(false);
 
   useEffect(() => {
     if (!carregando && user) void navigate({ to: approvalStatus === "approved" ? "/organizacao" : "/aguardando" });
@@ -49,12 +51,13 @@ function Entrar() {
     setOcupado(true);
     try {
       if (modo === "criar") {
+        if (!aceitou) throw new Error("Para criar a conta, aceite a Política de Privacidade.");
         const { error } = await supabase.auth.signUp({
           email,
           password: senha,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { nome },
+            data: { nome, politica_aceita: true },
           },
         });
         if (error) throw error;
@@ -154,6 +157,12 @@ function Entrar() {
                   onChange={(e) => setSenha(e.target.value)}
                 />
               </div>
+              {modo === "criar" && (
+                <label className="flex items-start gap-3 text-base">
+                  <Checkbox className="mt-1 size-6" checked={aceitou} onCheckedChange={(v) => setAceitou(v === true)} />
+                  <span>Li e aceito a <Link to="/privacidade" className="text-primary underline">Política de Privacidade</Link>, que explica quais dados são guardados (incluindo a voz).</span>
+                </label>
+              )}
               <Button type="submit" className="h-14 w-full text-lg" disabled={ocupado}>
                 {ocupado && <Loader2 className="mr-2 size-5 animate-spin" />}
                 {modo === "entrar" ? "Entrar" : "Criar conta"}

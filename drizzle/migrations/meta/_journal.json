@@ -50,6 +50,13 @@
       "when": 1794877052975,
       "tag": "0006_projetos_secoes",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794877606450,
+      "tag": "0007_politica_privacidade_aceite",
+      "breakpoints": true
     }
   ]
 }

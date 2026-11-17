@@ -1,3 +1,4 @@
+import { INSTRUCAO_MARCADORES, organizacaoParaIA } from "@/lib/privacidade";
 import { createServerFn } from "@tanstack/react-start";
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
@@ -162,15 +163,23 @@ const AnaliseInput = z.object({
     titulo: z.string(), orgao: z.string().nullable(), resumo: z.string().nullable(),
     exigencias: z.string().nullable(), valor_maximo: z.string().nullable(), prazo: z.string().nullable(),
   }),
-  organizacao: z.record(z.string(), z.unknown()),
+  organizacaoId: z.string().uuid(),
   documentos: z.array(z.object({ categoria: z.string(), nome: z.string(), data_validade: z.string().nullable() })),
 });
+
+/** Carrega a organização no servidor e devolve só os campos permitidos para a IA. */
+async function organizacaoSegura(supabase: SupabaseClient<Database>, id: string) {
+  const { data: org } = await supabase.from("organizacoes").select("*").eq("id", id).maybeSingle();
+  if (!org) throw new Error("Não encontramos a organização.");
+  return organizacaoParaIA(org);
+}
 
 export const analisarEdital = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => AnaliseInput.parse(input))
   .handler(async ({ data, context }) => {
     await exigirAprovacao(context);
+    const organizacao = await organizacaoSegura(context.supabase, data.organizacaoId);
     const lovable = criarModelo(pegarChave());
     const resultado = streamText({
       model: lovable.responses("openai/gpt-6-astra"),
@@ -185,7 +194,7 @@ export const analisarEdital = createServerFn({ method: "POST" })
         "Gere JSON neste formato:",
         '{"resumo":"frase simples","itens":[{"requisito":"","situacao":"atendido|pendente|nao_localizado","evidencia":"","orientacao":""}]}',
         "EDITAL:", JSON.stringify(data.edital),
-        "ORGANIZAÇÃO:", JSON.stringify(data.organizacao),
+        "ORGANIZAÇÃO (dados pessoais aparecem só como cadastrado/não cadastrado):", JSON.stringify(organizacao),
         "DOCUMENTOS (considere vencidos os que tiverem validade anterior à data atual):", JSON.stringify(data.documentos),
         "Separe todos os requisitos de participação, documentos, regularidade, território, experiência, prazo, contrapartida e impedimentos.",
       ].join("\n"),
@@ -211,7 +220,7 @@ export const analisarEdital = createServerFn({ method: "POST" })
 
 const IdeiasInput = z.object({
   edital: z.object({ titulo: z.string(), orgao: z.string().nullable(), resumo: z.string().nullable(), exigencias: z.string().nullable(), valor_maximo: z.string().nullable() }),
-  organizacao: z.record(z.string(), z.unknown()),
+  organizacaoId: z.string().uuid(),
   checklist: z.array(z.object({ requisito: z.string(), situacao: z.string(), evidencia: z.string(), orientacao: z.string() })),
 });
 
@@ -220,6 +229,7 @@ export const sugerirIdeias = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => IdeiasInput.parse(input))
   .handler(async ({ data, context }) => {
     await exigirAprovacao(context);
+    const organizacao = await organizacaoSegura(context.supabase, data.organizacaoId);
     const lovable = criarModelo(pegarChave());
     const resultado = streamText({
       model: lovable.responses("openai/gpt-6-astra"),
@@ -234,7 +244,7 @@ export const sugerirIdeias = createServerFn({ method: "POST" })
       prompt: [
         'Gere exatamente 3 ideias no formato: {"ideias":[{"titulo":"","objetivo":"","problema":"","publico":"","atividades":[""],"resultados":[""],"relacao_edital":"","recursos_confirmar":[""]}]}',
         `EDITAL: ${JSON.stringify(data.edital)}`,
-        `ORGANIZAÇÃO: ${JSON.stringify(data.organizacao)}`,
+        `ORGANIZAÇÃO: ${JSON.stringify(organizacao)}`,
         `CHECKLIST: ${JSON.stringify(data.checklist)}`,
         "Use linguagem simples, concreta e respeitosa. Não trate a sugestão como fato já decidido pela comunidade.",
       ].join("\n"),
@@ -301,9 +311,7 @@ export const escreverSecao = createServerFn({ method: "POST" })
     const secao = secoes[data.indice];
     if (!secao) throw new Error("Essa parte do projeto não existe.");
 
-    const { data: org } = await context.supabase.from("organizacoes").select("*").eq("id", projeto.organizacao_id!).maybeSingle();
-    if (!org) throw new Error("Não encontramos a organização do projeto.");
-    const { id: _id, owner_id: _o, created_at: _c, updated_at: _u, ...organizacao } = org;
+    const organizacao = await organizacaoSegura(context.supabase, projeto.organizacao_id!);
     const { data: analise } = projeto.analise_id
       ? await context.supabase.from("analises_editais").select("checklist").eq("id", projeto.analise_id).maybeSingle()
       : { data: null };
@@ -325,6 +333,7 @@ export const escreverSecao = createServerFn({ method: "POST" })
         "Responda de forma explícita aos critérios de pontuação relacionados a esta parte.",
         "Use SOMENTE as informações cadastradas da organização, comprovadas no checklist ou contadas pela comunidade. Onde faltar dado, escreva [COMPLETAR: ...].",
         "Nunca invente nomes, CNPJ, telefones, endereços, experiências ou valores. Não repita o que outras partes já dizem.",
+        INSTRUCAO_MARCADORES,
         "Responda em HTML simples usando apenas p, ul, li, ol, table, tr, th, td e strong. NÃO inclua o título da parte. Não use markdown nem ```.",
         primeira ? "Na PRIMEIRA linha escreva TITULO: <um título forte para o projeto>, depois o HTML da parte." : "",
       ].filter(Boolean).join(" "),

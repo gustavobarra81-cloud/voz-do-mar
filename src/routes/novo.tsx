@@ -252,7 +252,7 @@ function NovoProjeto() {
     try {
       const resultado = await analisar({ data: {
         edital: { ...editalEscolhido, prazo: editalEscolhido.prazo },
-        organizacao,
+        organizacaoId: organizacao.id,
         documentos: documentos ?? [],
       } });
       const { data, error } = await supabase.from("analises_editais").upsert({
@@ -291,7 +291,7 @@ function NovoProjeto() {
     try {
       const resultado = await sugerir({ data: {
         edital: { titulo: editalEscolhido.titulo, orgao: editalEscolhido.orgao, resumo: editalEscolhido.resumo, exigencias: editalEscolhido.exigencias, valor_maximo: editalEscolhido.valor_maximo },
-        organizacao,
+        organizacaoId: organizacao.id,
         checklist,
       } });
       setIdeias(resultado.ideias);

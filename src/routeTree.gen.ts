@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AceiteRouteImport } from './routes/aceite'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AguardandoRouteImport } from './routes/aguardando'
 import { Route as DocumentosRouteImport } from './routes/documentos'
@@ -17,6 +18,7 @@ import { Route as EditaisRouteImport } from './routes/editais'
 import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as NovoRouteImport } from './routes/novo'
 import { Route as OrganizacaoRouteImport } from './routes/organizacao'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as RadarRouteImport } from './routes/radar'
 import { Route as ProjetosIndexRouteImport } from './routes/projetos.index'
 import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
@@ -25,6 +27,11 @@ import { Route as ApiPublicJobsRadarSemanalRouteImport } from './routes/api/publ
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AceiteRoute = AceiteRouteImport.update({
+  id: '/aceite',
+  path: '/aceite',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -62,6 +69,11 @@ const OrganizacaoRoute = OrganizacaoRouteImport.update({
   path: '/organizacao',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RadarRoute = RadarRouteImport.update({
   id: '/radar',
   path: '/radar',
@@ -86,6 +98,7 @@ const ApiPublicJobsRadarSemanalRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/aceite': typeof AceiteRoute
   '/admin': typeof AdminRoute
   '/aguardando': typeof AguardandoRoute
   '/documentos': typeof DocumentosRoute
@@ -93,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/entrar': typeof EntrarRoute
   '/novo': typeof NovoRoute
   '/organizacao': typeof OrganizacaoRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/radar': typeof RadarRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/': typeof ProjetosIndexRoute
@@ -100,6 +114,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/aceite': typeof AceiteRoute
   '/admin': typeof AdminRoute
   '/aguardando': typeof AguardandoRoute
   '/documentos': typeof DocumentosRoute
@@ -107,6 +122,7 @@ export interface FileRoutesByTo {
   '/entrar': typeof EntrarRoute
   '/novo': typeof NovoRoute
   '/organizacao': typeof OrganizacaoRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/radar': typeof RadarRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos': typeof ProjetosIndexRoute
@@ -115,6 +131,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/aceite': typeof AceiteRoute
   '/admin': typeof AdminRoute
   '/aguardando': typeof AguardandoRoute
   '/documentos': typeof DocumentosRoute
@@ -122,6 +139,7 @@ export interface FileRoutesById {
   '/entrar': typeof EntrarRoute
   '/novo': typeof NovoRoute
   '/organizacao': typeof OrganizacaoRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/radar': typeof RadarRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/': typeof ProjetosIndexRoute
@@ -131,6 +149,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/aceite'
     | '/admin'
     | '/aguardando'
     | '/documentos'
@@ -138,6 +157,7 @@ export interface FileRouteTypes {
     | '/entrar'
     | '/novo'
     | '/organizacao'
+    | '/privacidade'
     | '/radar'
     | '/projetos/$id'
     | '/projetos/'
@@ -145,6 +165,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/aceite'
     | '/admin'
     | '/aguardando'
     | '/documentos'
@@ -152,6 +173,7 @@ export interface FileRouteTypes {
     | '/entrar'
     | '/novo'
     | '/organizacao'
+    | '/privacidade'
     | '/radar'
     | '/projetos/$id'
     | '/projetos'
@@ -159,6 +181,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/aceite'
     | '/admin'
     | '/aguardando'
     | '/documentos'
@@ -166,6 +189,7 @@ export interface FileRouteTypes {
     | '/entrar'
     | '/novo'
     | '/organizacao'
+    | '/privacidade'
     | '/radar'
     | '/projetos/$id'
     | '/projetos/'
@@ -174,6 +198,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AceiteRoute: typeof AceiteRoute
   AdminRoute: typeof AdminRoute
   AguardandoRoute: typeof AguardandoRoute
   DocumentosRoute: typeof DocumentosRoute
@@ -181,6 +206,7 @@ export interface RootRouteChildren {
   EntrarRoute: typeof EntrarRoute
   NovoRoute: typeof NovoRoute
   OrganizacaoRoute: typeof OrganizacaoRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
   RadarRoute: typeof RadarRoute
   ProjetosIdRoute: typeof ProjetosIdRoute
   ProjetosIndexRoute: typeof ProjetosIndexRoute
@@ -194,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/aceite': {
+      id: '/aceite'
+      path: '/aceite'
+      fullPath: '/aceite'
+      preLoaderRoute: typeof AceiteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -245,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrganizacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/radar': {
       id: '/radar'
       path: '/radar'
@@ -278,6 +318,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AceiteRoute: AceiteRoute,
   AdminRoute: AdminRoute,
   AguardandoRoute: AguardandoRoute,
   DocumentosRoute: DocumentosRoute,
@@ -285,6 +326,7 @@ const rootRouteChildren: RootRouteChildren = {
   EntrarRoute: EntrarRoute,
   NovoRoute: NovoRoute,
   OrganizacaoRoute: OrganizacaoRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
   RadarRoute: RadarRoute,
   ProjetosIdRoute: ProjetosIdRoute,
   ProjetosIndexRoute: ProjetosIndexRoute,

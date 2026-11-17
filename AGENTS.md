@@ -13,3 +13,4 @@
 - O contador de aprovações consulta somente o número de perfis pendentes via RLS e atualiza periodicamente ou após uma decisão administrativa. Isso mantém a navegação sincronizada sem revelar cadastros a usuários comuns.
 - O Radar de Editais só grava editais cujo link aparece literalmente no texto baixado das fontes; somente administradores disparam a busca (consome IA). Isso evita editais inventados.
 - Projects are written one section at a time (projetos.secoes holds each part; conteudo is rebuilt from it) so generation resumes after a closed page and single parts can be rewritten.
+- Personal data (CPF, phones, e-mails, addresses, representative name) never reaches the AI: server sends an allow-list (src/lib/privacidade.ts) and the AI writes placeholders swapped for real data only on display/export.

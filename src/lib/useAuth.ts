@@ -7,6 +7,7 @@ export function useAuth() {
   const [carregando, setCarregando] = useState(true);
   const [approvalStatus, setApprovalStatus] = useState<"pending" | "approved" | "rejected" | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [politicaAceita, setPoliticaAceita] = useState(true);
 
   useEffect(() => {
     async function carregarAcesso(novaSessao: Session | null) {
@@ -18,12 +19,13 @@ export function useAuth() {
         return;
       }
       const [{ data: perfil }, { data: papel }] = await Promise.all([
-        supabase.from("profiles").select("approval_status").eq("id", novaSessao.user.id).maybeSingle(),
+        supabase.from("profiles").select("approval_status, politica_aceita_em").eq("id", novaSessao.user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", novaSessao.user.id).eq("role", "admin").maybeSingle(),
       ]);
       const status = perfil?.approval_status;
       setApprovalStatus(status === "approved" || status === "rejected" ? status : "pending");
       setIsAdmin(papel?.role === "admin");
+      setPoliticaAceita(Boolean(perfil?.politica_aceita_em));
       setCarregando(false);
     }
 
@@ -35,7 +37,9 @@ export function useAuth() {
       void carregarAcesso(data.session);
     });
 
-    return () => sub.subscription.unsubscribe();
+    const aoAceitar = () => setPoliticaAceita(true);
+    window.addEventListener("politica-aceita", aoAceitar);
+    return () => { sub.subscription.unsubscribe(); window.removeEventListener("politica-aceita", aoAceitar); };
   }, []);
 
   return {
@@ -45,5 +49,6 @@ export function useAuth() {
     approvalStatus,
     aprovado: approvalStatus === "approved",
     isAdmin,
+    politicaAceita,
   };
 }

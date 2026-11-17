@@ -309,6 +309,7 @@ export type Database = {
           email: string | null
           id: string
           nome: string | null
+          politica_aceita_em: string | null
           reviewed_at: string | null
           reviewed_by: string | null
         }
@@ -319,6 +320,7 @@ export type Database = {
           email?: string | null
           id: string
           nome?: string | null
+          politica_aceita_em?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
         }
@@ -329,6 +331,7 @@ export type Database = {
           email?: string | null
           id?: string
           nome?: string | null
+          politica_aceita_em?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
         }
@@ -475,6 +478,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aceitar_politica: { Args: never; Returns: string }
       current_approval_status: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

@@ -1,3 +1,4 @@
+import { substituirMarcadores } from "@/lib/privacidade";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -53,13 +54,20 @@ function VerProjeto() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projetos")
-        .select("id, titulo, conteudo, created_at, status, secoes")
+        .select("id, titulo, conteudo, created_at, status, secoes, organizacao_id")
         .eq("id", id)
         .single();
       if (error) throw error;
       return data;
     },
   });
+
+  // Dados pessoais reais só entram na hora de exibir/exportar; o banco guarda marcadores.
+  const { data: org } = useQuery({
+    enabled: Boolean(projeto?.organizacao_id), queryKey: ["organizacao-dados", projeto?.organizacao_id],
+    queryFn: async () => { const { data } = await supabase.from("organizacoes").select("*").eq("id", projeto!.organizacao_id!).maybeSingle(); return data; },
+  });
+  const real = (html: string) => substituirMarcadores(html, org);
 
   useEffect(() => {
     if (projeto?.conteudo) setRascunho(projeto.conteudo);
@@ -118,7 +126,7 @@ function VerProjeto() {
   }
 
   function baixarWord() {
-    const documento = `<!doctype html><html><head><meta charset="utf-8"><title>${projeto?.titulo ?? "Projeto"}</title></head><body style="font-family:Georgia,serif;line-height:1.6">${projeto?.conteudo ?? ""}</body></html>`;
+    const documento = `<!doctype html><html><head><meta charset="utf-8"><title>${projeto?.titulo ?? "Projeto"}</title></head><body style="font-family:Georgia,serif;line-height:1.6">${real(projeto?.conteudo ?? "")}</body></html>`;
     const url = URL.createObjectURL(new Blob([documento], { type: "application/msword" }));
     const link = document.createElement("a");
     link.href = url;
@@ -181,13 +189,13 @@ function VerProjeto() {
             <article className="texto-projeto space-y-6 rounded-3xl bg-card p-6 shadow-soft md:p-10">
               <h2>{projeto?.titulo}</h2>
               {secoes.map((secao, i) => secao.html ? (
-                <ParteProjeto key={i} secao={secao} indice={i} projetoId={id} bloqueado={escrevendo !== null} aoMudar={() => void refetch()} />
+                <ParteProjeto key={i} secao={secao} indice={i} projetoId={id} bloqueado={escrevendo !== null} aoMudar={() => void refetch()} real={real} />
               ) : null)}
             </article>
           ) : (
             <article
               className="texto-projeto rounded-3xl bg-card p-6 shadow-soft md:p-10"
-              dangerouslySetInnerHTML={{ __html: projeto?.conteudo ?? "" }}
+              dangerouslySetInnerHTML={{ __html: real(projeto?.conteudo ?? "") }}
             />
           )
         )}
@@ -196,7 +204,7 @@ function VerProjeto() {
   );
 }
 
-function ParteProjeto({ secao, indice, projetoId, bloqueado, aoMudar }: { secao: SecaoProjeto; indice: number; projetoId: string; bloqueado: boolean; aoMudar: () => void }) {
+function ParteProjeto({ secao, indice, projetoId, bloqueado, aoMudar, real }: { secao: SecaoProjeto; indice: number; projetoId: string; bloqueado: boolean; aoMudar: () => void; real: (html: string) => string }) {
   const escrever = useServerFn(escreverSecao);
   const transcrever = useServerFn(transcreverAudio);
   const [aberto, setAberto] = useState(false);
@@ -219,7 +227,7 @@ function ParteProjeto({ secao, indice, projetoId, bloqueado, aoMudar }: { secao:
   return (
     <section className="relative">
       <h3>{secao.nome}</h3>
-      <div className={ocupado ? "opacity-50" : ""} dangerouslySetInnerHTML={{ __html: secao.html }} />
+      <div className={ocupado ? "opacity-50" : ""} dangerouslySetInnerHTML={{ __html: real(secao.html) }} />
       <div className="nao-imprimir mt-3">
         {!aberto ? (
           <Button variant="outline" size="sm" disabled={bloqueado} onClick={() => setAberto(true)}><PenLine className="mr-2 size-4" />Reescrever esta parte</Button>
