@@ -12,6 +12,8 @@ import { dividirHtml, normalizarSecoesProjeto, proximaSecaoVazia, type SecaoProj
 import { Cabecalho } from "@/components/Cabecalho";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { EditorProjeto } from "@/components/EditorProjeto";
+import { destacarCompletar, limparHtml, listarCompletar } from "@/lib/html";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { useAuth } from "@/lib/useAuth";
@@ -67,7 +69,9 @@ function VerProjeto() {
     enabled: Boolean(projeto?.organizacao_id), queryKey: ["organizacao-dados", projeto?.organizacao_id],
     queryFn: async () => { const { data } = await supabase.from("organizacoes").select("*").eq("id", projeto!.organizacao_id!).maybeSingle(); return data; },
   });
-  const real = (html: string) => substituirMarcadores(html, org);
+  // Exibição: limpa o HTML, troca marcadores de dados pessoais e destaca o que falta preencher.
+  const real = (html: string) => destacarCompletar(limparHtml(substituirMarcadores(limparHtml(html), org)));
+  const faltando = listarCompletar(projeto?.conteudo ?? "");
 
   useEffect(() => {
     if (projeto?.conteudo) setRascunho(projeto.conteudo);
@@ -110,10 +114,11 @@ function VerProjeto() {
   }, [projeto?.id, proxima >= 0]);
 
   async function salvar() {
+    const limpo = limparHtml(rascunho);
     setSalvando(true);
     const { error } = await supabase
       .from("projetos")
-      .update({ conteudo: rascunho, ...(secoes.length > 0 ? { secoes: dividirHtml(rascunho, secoes) as unknown as Json } : {}), updated_at: new Date().toISOString() })
+      .update({ conteudo: limpo, ...(secoes.length > 0 ? { secoes: dividirHtml(limpo, secoes).map((x) => ({ ...x, html: limparHtml(x.html) })) as unknown as Json } : {}), updated_at: new Date().toISOString() })
       .eq("id", id);
     setSalvando(false);
     if (error) {
@@ -125,14 +130,23 @@ function VerProjeto() {
     toast.success("Alterações salvas.");
   }
 
-  function baixarWord() {
-    const documento = `<!doctype html><html><head><meta charset="utf-8"><title>${projeto?.titulo ?? "Projeto"}</title></head><body style="font-family:Georgia,serif;line-height:1.6">${real(projeto?.conteudo ?? "")}</body></html>`;
-    const url = URL.createObjectURL(new Blob([documento], { type: "application/msword" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${(projeto?.titulo ?? "projeto").replace(/[^\p{L}\d ]/gu, "").slice(0, 60)}.doc`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const [baixando, setBaixando] = useState(false);
+  async function baixarWord() {
+    setBaixando(true);
+    try {
+      const { htmlParaDocx } = await import("@/lib/docx-export");
+      // Dados reais entram só aqui, no arquivo baixado; sem o destaque amarelo.
+      const html = limparHtml(substituirMarcadores(limparHtml(projeto?.conteudo ?? ""), org));
+      const blob = await htmlParaDocx(projeto?.titulo ?? "Projeto", html);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${(projeto?.titulo ?? "projeto").replace(/[^\p{L}\d ]/gu, "").trim().slice(0, 60) || "projeto"}.docx`;
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch {
+      toast.error("Não conseguimos montar o arquivo. Tente de novo.");
+    } finally { setBaixando(false); }
   }
 
   return (
@@ -149,8 +163,8 @@ function VerProjeto() {
         <h1 className="text-3xl font-bold">{projeto?.titulo ?? "Carregando..."}</h1>
 
         <div className="nao-imprimir flex flex-wrap gap-3">
-          <Button variant="outline" className="h-12 text-base" onClick={baixarWord}>
-            <Download className="mr-2 size-5" /> Baixar documento
+          <Button variant="outline" className="h-12 text-base" disabled={baixando || !projeto?.conteudo} onClick={() => void baixarWord()}>
+            {baixando ? <Loader2 className="mr-2 size-5 animate-spin" /> : <Download className="mr-2 size-5" />} Baixar Word (.docx)
           </Button>
           <Button variant="outline" className="h-12 text-base" onClick={() => window.print()}>
             <Printer className="mr-2 size-5" /> Imprimir / salvar PDF
@@ -177,13 +191,18 @@ function VerProjeto() {
           </div>
         )}
 
+        {faltando.length > 0 && proxima < 0 && (
+          <div className="nao-imprimir space-y-2 rounded-3xl border-2 border-warning bg-warning/15 p-5">
+            <p className="text-lg font-bold">Falta preencher {faltando.length} {faltando.length === 1 ? "item" : "itens"}</p>
+            <p className="text-sm text-muted-foreground">Estão marcados em amarelo no texto. Use "Corrigir texto" para completar.</p>
+            <ul className="list-disc space-y-1 pl-6 text-base">
+              {faltando.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
+        )}
+
         {editando ? (
-          <Textarea
-            rows={30}
-            className="font-mono text-sm"
-            value={rascunho}
-            onChange={(e) => setRascunho(e.target.value)}
-          />
+          <EditorProjeto valor={limparHtml(rascunho)} aoMudar={setRascunho} />
         ) : (
           secoes.length > 0 ? (
             <article className="texto-projeto space-y-6 rounded-3xl bg-card p-6 shadow-soft md:p-10">

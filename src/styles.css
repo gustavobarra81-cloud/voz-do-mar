@@ -26,6 +26,8 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
@@ -64,6 +66,8 @@
   --muted: oklch(0.95 0.02 95);
   --muted-foreground: oklch(0.48 0.03 235);
   --accent: oklch(0.72 0.16 45);
+  --warning: oklch(0.88 0.16 95);
+  --warning-foreground: oklch(0.25 0.05 80);
   --accent-foreground: oklch(0.99 0.01 95);
   --destructive: oklch(0.55 0.21 25);
   --destructive-foreground: oklch(0.985 0.01 95);
@@ -91,6 +95,8 @@
   --muted: oklch(0.31 0.04 235);
   --muted-foreground: oklch(0.75 0.03 200);
   --accent: oklch(0.74 0.16 50);
+  --warning: oklch(0.8 0.15 95);
+  --warning-foreground: oklch(0.2 0.04 80);
   --accent-foreground: oklch(0.2 0.04 235);
   --destructive: oklch(0.62 0.2 25);
   --destructive-foreground: oklch(0.98 0.01 95);
@@ -169,6 +175,24 @@
   }
   & strong {
     font-weight: 700;
+  }
+  & h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0.8rem 0 0.3rem;
+  }
+  & mark.completar {
+    background: var(--color-warning);
+    color: var(--color-warning-foreground);
+    padding: 0 0.2em;
+    border-radius: 0.25em;
+    font-weight: 700;
+  }
+  & .tableWrapper {
+    overflow-x: auto;
+  }
+  & .selectedCell {
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
   }
 }
 
