@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/useAuth";
+import { useAuth, useExigirAprovacao } from "@/lib/useAuth";
 import { useOrganizacoes } from "@/lib/useOrganizacoes";
 import { ABRANGENCIAS, TEMAS, diasRestantes, filtrarRadar, linkWhatsApp, urgente, type RadarEdital } from "@/lib/radar";
 import { atualizarRadar } from "@/lib/radar.functions";
@@ -34,6 +34,7 @@ function alternar(lista: string[], id: string) { return lista.includes(id) ? lis
 
 function RadarPagina() {
   const { user, carregando, isAdmin } = useAuth();
+  useExigirAprovacao();
   const navigate = useNavigate();
   const { organizacao } = useOrganizacoes();
   const [abrangencias, setAbrangencias] = useState<string[]>([]);

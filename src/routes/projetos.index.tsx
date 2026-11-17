@@ -6,7 +6,7 @@ import { Cabecalho } from "@/components/Cabecalho";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/useAuth";
+import { useAuth, useExigirAprovacao } from "@/lib/useAuth";
 import { useOrganizacoes } from "@/lib/useOrganizacoes";
 import { SeletorOrganizacao } from "@/components/SeletorOrganizacao";
 
@@ -33,6 +33,7 @@ export const Route = createFileRoute("/projetos/")({
 function ListaProjetos() {
   const navigate = useNavigate();
   const { user, carregando } = useAuth();
+  useExigirAprovacao();
   const { organizacao } = useOrganizacoes();
 
   useEffect(() => {

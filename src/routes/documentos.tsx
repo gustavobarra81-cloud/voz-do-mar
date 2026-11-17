@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIAS_DOCUMENTO } from "@/lib/organizacao";
-import { useAuth } from "@/lib/useAuth";
+import { useAuth, useExigirAprovacao } from "@/lib/useAuth";
 import { useOrganizacoes } from "@/lib/useOrganizacoes";
 import { SeletorOrganizacao } from "@/components/SeletorOrganizacao";
 
@@ -35,6 +35,7 @@ function situacao(validade: string | null) {
 
 function Documentos() {
   const navigate = useNavigate(); const { user, carregando } = useAuth();
+  useExigirAprovacao();
   const { organizacao, isLoading } = useOrganizacoes();
   const [categoria, setCategoria] = useState(""); const [nome, setNome] = useState("");
   const [emissao, setEmissao] = useState(""); const [validade, setValidade] = useState(""); const [enviando, setEnviando] = useState(false);

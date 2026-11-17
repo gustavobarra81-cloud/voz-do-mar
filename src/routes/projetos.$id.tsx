@@ -16,7 +16,7 @@ import { EditorProjeto } from "@/components/EditorProjeto";
 import { destacarCompletar, limparHtml, listarCompletar } from "@/lib/html";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import { useAuth } from "@/lib/useAuth";
+import { useAuth, useExigirAprovacao } from "@/lib/useAuth";
 
 export const Route = createFileRoute("/projetos/$id")({
   head: () => ({
@@ -42,6 +42,7 @@ function VerProjeto() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const { user, carregando } = useAuth();
+  useExigirAprovacao();
   const [editando, setEditando] = useState(false);
   const [rascunho, setRascunho] = useState("");
   const [salvando, setSalvando] = useState(false);

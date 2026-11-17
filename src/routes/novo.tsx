@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/useAuth";
+import { useAuth, useExigirAprovacao } from "@/lib/useAuth";
 import { useOrganizacoes } from "@/lib/useOrganizacoes";
 import { SeletorOrganizacao } from "@/components/SeletorOrganizacao";
 import { normalizarEstrutura } from "@/lib/edital";
@@ -81,6 +81,7 @@ function checklistValido(valor: unknown): valor is ItemAnalise[] {
 function NovoProjeto() {
   const navigate = useNavigate();
   const { user, carregando } = useAuth();
+  useExigirAprovacao();
   const { organizacao, organizacoes } = useOrganizacoes();
   const [etapa, setEtapa] = useState(0);
   const [editalId, setEditalId] = useState<string | null>(null);

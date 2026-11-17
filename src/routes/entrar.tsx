@@ -35,7 +35,7 @@ export const Route = createFileRoute("/entrar")({
 function Entrar() {
   const navigate = useNavigate();
   const { user, carregando, approvalStatus } = useAuth();
-  const [modo, setModo] = useState<"entrar" | "criar">("entrar");
+  const [modo, setModo] = useState<"entrar" | "criar" | "esqueci">("entrar");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [nome, setNome] = useState("");
@@ -50,7 +50,12 @@ function Entrar() {
     evento.preventDefault();
     setOcupado(true);
     try {
-      if (modo === "criar") {
+      if (modo === "esqueci") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/redefinir-senha` });
+        if (error) throw error;
+        toast.success("Se este e-mail estiver cadastrado, você vai receber um link para criar uma nova senha. Confira também a caixa de spam.");
+        setModo("entrar");
+      } else if (modo === "criar") {
         if (!aceitou) throw new Error("Para criar a conta, aceite a Política de Privacidade.");
         const { error } = await supabase.auth.signUp({
           email,
@@ -93,7 +98,7 @@ function Entrar() {
         <Card className="shadow-soft">
           <CardHeader>
             <CardTitle className="text-2xl">
-              {modo === "entrar" ? "Entrar" : "Criar conta"}
+              {modo === "entrar" ? "Entrar" : modo === "criar" ? "Criar conta" : "Esqueci minha senha"}
             </CardTitle>
             <CardDescription className="text-base">
               Novos cadastros são liberados após aprovação da equipe responsável.
@@ -143,7 +148,7 @@ function Entrar() {
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
+              {modo !== "esqueci" && <div className="space-y-2">
                 <Label htmlFor="senha" className="text-base">
                   Senha
                 </Label>
@@ -156,7 +161,8 @@ function Entrar() {
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                 />
-              </div>
+              </div>}
+              {modo === "esqueci" && <p className="text-base text-muted-foreground">Digite o e-mail da sua conta. Vamos enviar um link para você criar uma nova senha.</p>}
               {modo === "criar" && (
                 <label className="flex items-start gap-3 text-base">
                   <Checkbox className="mt-1 size-6" checked={aceitou} onCheckedChange={(v) => setAceitou(v === true)} />
@@ -165,16 +171,21 @@ function Entrar() {
               )}
               <Button type="submit" className="h-14 w-full text-lg" disabled={ocupado}>
                 {ocupado && <Loader2 className="mr-2 size-5 animate-spin" />}
-                {modo === "entrar" ? "Entrar" : "Criar conta"}
+                {modo === "entrar" ? "Entrar" : modo === "criar" ? "Criar conta" : "Enviar link por e-mail"}
               </Button>
             </form>
 
+            {modo === "entrar" && (
+              <button type="button" className="w-full text-center text-base text-primary underline" onClick={() => setModo("esqueci")}>
+                Esqueci minha senha
+              </button>
+            )}
             <button
               type="button"
               className="w-full text-center text-base text-primary underline"
               onClick={() => setModo(modo === "entrar" ? "criar" : "entrar")}
             >
-              {modo === "entrar" ? "Ainda não tenho conta" : "Já tenho conta"}
+              {modo === "entrar" ? "Ainda não tenho conta" : "Voltar para entrar"}
             </button>
           </CardContent>
         </Card>

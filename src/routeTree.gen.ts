@@ -20,6 +20,7 @@ import { Route as NovoRouteImport } from './routes/novo'
 import { Route as OrganizacaoRouteImport } from './routes/organizacao'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as RadarRouteImport } from './routes/radar'
+import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as ProjetosIndexRouteImport } from './routes/projetos.index'
 import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
 import { Route as ApiPublicJobsRadarSemanalRouteImport } from './routes/api/public/jobs/radar-semanal'
@@ -79,6 +80,11 @@ const RadarRoute = RadarRouteImport.update({
   path: '/radar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
+  id: '/redefinir-senha',
+  path: '/redefinir-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjetosIndexRoute = ProjetosIndexRouteImport.update({
   id: '/projetos/',
   path: '/projetos/',
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/organizacao': typeof OrganizacaoRoute
   '/privacidade': typeof PrivacidadeRoute
   '/radar': typeof RadarRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/': typeof ProjetosIndexRoute
   '/api/public/jobs/radar-semanal': typeof ApiPublicJobsRadarSemanalRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/organizacao': typeof OrganizacaoRoute
   '/privacidade': typeof PrivacidadeRoute
   '/radar': typeof RadarRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos': typeof ProjetosIndexRoute
   '/api/public/jobs/radar-semanal': typeof ApiPublicJobsRadarSemanalRoute
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/organizacao': typeof OrganizacaoRoute
   '/privacidade': typeof PrivacidadeRoute
   '/radar': typeof RadarRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/': typeof ProjetosIndexRoute
   '/api/public/jobs/radar-semanal': typeof ApiPublicJobsRadarSemanalRoute
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/organizacao'
     | '/privacidade'
     | '/radar'
+    | '/redefinir-senha'
     | '/projetos/$id'
     | '/projetos/'
     | '/api/public/jobs/radar-semanal'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/organizacao'
     | '/privacidade'
     | '/radar'
+    | '/redefinir-senha'
     | '/projetos/$id'
     | '/projetos'
     | '/api/public/jobs/radar-semanal'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/organizacao'
     | '/privacidade'
     | '/radar'
+    | '/redefinir-senha'
     | '/projetos/$id'
     | '/projetos/'
     | '/api/public/jobs/radar-semanal'
@@ -208,6 +220,7 @@ export interface RootRouteChildren {
   OrganizacaoRoute: typeof OrganizacaoRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   RadarRoute: typeof RadarRoute
+  RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   ProjetosIdRoute: typeof ProjetosIdRoute
   ProjetosIndexRoute: typeof ProjetosIndexRoute
   ApiPublicJobsRadarSemanalRoute: typeof ApiPublicJobsRadarSemanalRoute
@@ -292,6 +305,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RadarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/redefinir-senha': {
+      id: '/redefinir-senha'
+      path: '/redefinir-senha'
+      fullPath: '/redefinir-senha'
+      preLoaderRoute: typeof RedefinirSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projetos/': {
       id: '/projetos/'
       path: '/projetos'
@@ -328,6 +348,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrganizacaoRoute: OrganizacaoRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   RadarRoute: RadarRoute,
+  RedefinirSenhaRoute: RedefinirSenhaRoute,
   ProjetosIdRoute: ProjetosIdRoute,
   ProjetosIndexRoute: ProjetosIndexRoute,
   ApiPublicJobsRadarSemanalRoute: ApiPublicJobsRadarSemanalRoute,

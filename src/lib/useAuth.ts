@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 
 export function useAuth() {
@@ -51,4 +52,13 @@ export function useAuth() {
     isAdmin,
     politicaAceita,
   };
+}
+
+/** Leva para /aguardando quem está conectado mas ainda não foi aprovado (ou foi recusado). */
+export function useExigirAprovacao() {
+  const { user, carregando, approvalStatus } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!carregando && user && approvalStatus !== "approved") void navigate({ to: "/aguardando", replace: true });
+  }, [carregando, user, approvalStatus, navigate]);
 }

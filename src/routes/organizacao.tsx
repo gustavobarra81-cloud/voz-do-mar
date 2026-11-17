@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { cadastroCompleto, ORGANIZACAO_VAZIA, TIPOS_ORGANIZACAO, type OrganizacaoForm } from "@/lib/organizacao";
-import { useAuth } from "@/lib/useAuth";
+import { useAuth, useExigirAprovacao } from "@/lib/useAuth";
 import { useOrganizacoes } from "@/lib/useOrganizacoes";
 import { SeletorOrganizacao } from "@/components/SeletorOrganizacao";
 
@@ -34,6 +34,7 @@ function Organizacao() {
   const navigate = useNavigate();
   const { nova } = Route.useSearch();
   const { user, carregando } = useAuth();
+  useExigirAprovacao();
   const { organizacoes, organizacao: selecionada, refetchOrganizacoes, escolher } = useOrganizacoes();
   const organizacao = nova ? null : selecionada;
   const [form, setForm] = useState<OrganizacaoForm>(ORGANIZACAO_VAZIA);
